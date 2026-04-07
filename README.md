@@ -1,9 +1,9 @@
-# [Team Name] — [System Name]
+# [Team Name] — Food Delivery Coordination
 
 **Course:** COMPSCI 426  
-**Team:** [Name], [Name], [Name], ...  
-**System:** [e.g. Event Ticketing / Food Delivery / Video Platform / ...]  
-**Repository:** [GitHub URL — public fork of https://github.com/umass-cs-426/starter-project]
+**Team:** Eva Choudhury, Gianna Leidich, Jada Tu, Ashley Kang, Nivaan Gupta, Aryan Deshpande, Ayaan Sattar
+**System:** Food Delivery
+**Repository:** https://github.com/aryand15/team-2-food-delivery
 
 ---
 
@@ -11,9 +11,13 @@
 
 | Team Member | Services / Components Owned                            |
 | ----------- | ------------------------------------------------------ |
-| [Name]      | [e.g. `order-service/`, `order-service/db/schema.sql`] |
-| [Name]      | [e.g. `restaurant-service/`, `redis/menu-cache`]       |
-| [Name]      | [e.g. `dispatch-worker/`, `k6/`]                       |
+| Nivan     | [e.g. `driver-service/`, `driver-db/`] |
+| Aryan    | [e.g. `order-service/`, `order-db/`]       |
+| Ayaan    | [e.g. `restaurant-service/`, `restaurant-db/`]         |
+| Eva    | [e.g. `redis`, `caddy`]         |
+| Jada    | [e.g. `preparation-tracker`, `delivery-tracker/`]         |
+| Ashley    | [e.g. `order-dispatch`]         |
+| Gianna    | [e.g. `notification-worker`]         |
 
 > Ownership is verified by `git log --author`. Each person must have meaningful commits in the directories they claim.
 
