@@ -1,4 +1,4 @@
-# [Team Name] — Food Delivery Coordination
+# Team 2 — Food Delivery Coordination
 
 **Course:** COMPSCI 426  
 **Team:** Eva Choudhury, Gianna Leidich, Jada Tu, Ashley Kang, Nivaan Gupta, Aryan Deshpande, Ayaan Sattar

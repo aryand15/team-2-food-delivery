@@ -1,4 +1,4 @@
-# Sprint 1 Plan — [Team Name]
+# Sprint 1 Plan — Team 2
 
 **Sprint:** 1 — Foundation  
 **Dates:** 04.07 → 04.14  
@@ -8,17 +8,22 @@
 
 ## Goal
 
-[One or two sentences on what your team will have working by end of sprint. Be specific. "Order service, restaurant service, and synchronous call between them running in Docker Compose with health endpoints" is good. "Get stuff working" is not.]
+The main goal of Sprint 1 is to have a working system where we have at least one service to service HTTP call and each service connects to its own Postgres database where it exposes at least one working endpoint. We would like atleast 1-2 services and synchronous call between them running in Docker Compose with health endpoints. 
 
 ---
 
 ## Ownership
 
-| Team Member | Files / Directories Owned This Sprint           |
-| ----------- | ----------------------------------------------- |
-| [Name]      | `[service-dir]/`, `[service-dir]/db/schema.sql` |
-| [Name]      | `[service-dir]/`, `compose.yml` additions       |
-| [Name]      | `k6/sprint-1.js`, `[worker-dir]/`               |
+
+| Team Member | Services / Components Owned                            |
+| ----------- | ------------------------------------------------------ |
+| Nivan     | [e.g. `driver-service/`, `driver-db/`] |
+| Aryan    | [e.g. `order-service/`, `order-db/`]       |
+| Ayaan    | [e.g. `restaurant-service/`, `restaurant-db/`]         |
+| Eva    | [e.g. `redis`, `caddy`]         |
+| Jada    | [e.g. `preparation-tracker`, `delivery-tracker/`]         |
+| Ashley    | [e.g. `order-dispatch`]         |
+| Gianna    | [e.g. `notification-worker`]         |
 
 Each person must have meaningful commits in the paths they claim. Ownership is verified by:
 
@@ -30,31 +35,33 @@ git log --author="Name" --oneline -- path/to/directory/
 
 ## Tasks
 
-### [Name]
+### Nivan & Gianna
 
-- [ ] Set up `[service]/` with Express + Postgres connection
-- [ ] Implement `GET /health` with DB check
-- [ ] Write `db/schema.sql` and seed script
-- [ ] Add `healthcheck` directive to `compose.yml`
+- [ ] Set up `driver-service/` with Express + Postgres connection
+- [ ] Implement one working endpoint
 
-### [Name]
+### Ayaan & Jada
 
-- [ ] Set up `[service]/` with Express + Redis connection
-- [ ] Implement `GET /health` with Redis check
-- [ ] Implement `GET /[resource]` — stub returning placeholder data
-- [ ] Test synchronous call to [other service]
+- [ ] Set up `restaurant-service/` with Express + Postgres connection
+- [ ] Implement one working endpoint
+- [ ] Write `compose.yml` connecting services
 
-### [Name]
 
-- [ ] Wire `depends_on: condition: service_healthy` in `compose.yml`
-- [ ] Write `k6/sprint-1.js` baseline load test
-- [ ] Write `README.md` startup instructions and endpoint list
+### Aryan & Ashley
+
+- [ ] Set up `order-service/` with Express + Postgres connection
+- [ ] Implement one working endpoint
+
+
+### Eva 
+
+- [ ] Create a Redis container that is running and at least one service connects to it on startup
 
 ---
 
 ## Risks
 
-[What could go wrong? What are you uncertain about? What will you do if a task takes longer than expected?]
+We could end up with problems pushing to the branch at the same time, dealing with debugging, taking some time to set up the services, and dealing with dependency issues. We will ask for help from the professor or the TA if it takes longer than expected and clearly communicate with our teammates.
 
 ---
 
