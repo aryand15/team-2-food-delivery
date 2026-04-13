@@ -3,12 +3,28 @@ import pg from 'pg'
 import { createClient } from 'redis'
 
 const app = express()
+const port = process.env.PORT || 3002
+const service = process.env.SERVICE_NAME || "driver"  
+
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL })
 const redis = createClient({ url: process.env.REDIS_URL })
-await redis.connect()
+// await redis.connect()
 
-const startTime = Date.now()
+if (redis)
 
+// check redis
+redis.on('error', err => {
+    console.error("Redis error:", err.message)
+})
+
+
+app.use(express.json())
+
+app.get("/", (req, res) => {
+    res.json({message: "Driver service running."})
+})
+
+// health endpoint
 app.get('/health', async (req, res) => {
     const checks = {}
     let healthy = true
@@ -34,7 +50,7 @@ app.get('/health', async (req, res) => {
 
     const body = {
         status: healthy ? 'healthy' : 'unhealthy',
-        service: process.env.SERVICE_NAME ?? 'unknown',
+        service: process.env.service ?? 'unknown',
         timestamp: new Date().toISOString(),
         uptime_seconds: Math.floor((Date.now() - startTime) / 1000),
         checks,
@@ -43,3 +59,18 @@ app.get('/health', async (req, res) => {
     res.status(healthy ? 200 : 503).json(body)
 
 })
+
+// start server
+async function start() {
+  if (redis) {
+    await redis.connect();
+  }
+  app.listen(PORT, () => {
+    console.log(`Driver service listening on port ${port}`);
+  });
+}
+
+start().catch((error) => {
+  console.error("Failed to start driver service:", error.message || String(error));
+  process.exit(1);
+});
