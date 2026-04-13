@@ -34,12 +34,26 @@ app.get('/health', async (req, res) => {
 
     const body = {
         status: healthy ? 'healthy' : 'unhealthy',
-        service: process.env.SERVICE_NAME ?? 'unknown',
+        service: process.env.SERVICE_NAME ?? 'driver-service',
         timestamp: new Date().toISOString(),
         uptime_seconds: Math.floor((Date.now() - startTime) / 1000),
         checks,
     }
     
     res.status(healthy ? 200 : 503).json(body)
+})
 
+// Placeholder endpoint for drivers
+app.get('/drivers', async (req, res) => {
+    // Placeholder data
+    const drivers = [
+        { id: 1, name: 'John Doe', status: 'available' },
+        { id: 2, name: 'Jane Smith', status: 'busy' }
+    ]
+    res.json(drivers)
+})
+
+const PORT = process.env.PORT || 3002
+app.listen(PORT, () => {
+    console.log(`Driver service listening on port ${PORT}`)
 })
