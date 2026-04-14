@@ -44,3 +44,15 @@ app.get('/health', async (req, res) => {
 
   res.status(healthy ? 200 : 503).json(body)
 })
+
+// Placeholder endpoint for getting drivers from driver service
+app.get('/get-drivers', async (req, res) => {
+    const response = await fetch("http://driver-service:3002/drivers");
+    const data = await response.json();
+    res.json(data);
+})
+
+const PORT = process.env.PORT || 3001
+app.listen(PORT, () => {
+    console.log(`Order service listening on port ${PORT}`)
+})
