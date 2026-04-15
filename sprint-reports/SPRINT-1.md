@@ -25,7 +25,7 @@ Three microservices — `order-service`, `driver-service`, and `restaurant-servi
 | Ayaan       | restaurant-service health endpoint                                               | `restaurant/restaurant.js`                | 59e6bff, 689fa05, PR #12       |
 | Jada        | restaurant-service scaffold, `/restaurants` and `/health` routes                 | `restaurant/restaurant.js`, `restaurant/package.json` | 1244ed5, a2633c5   |
 | Ashley      | order-service health endpoint (initial implementation, reverted, reimplemented)  | `order/server.js`                         | a558672, 504c9e8, PRs #1–2, #5 |
-| Phoebe      | k6 baseline script, sprint report                                                | `k6/sprint-1.js`, `sprint-reports/SPRINT-1.md` | (this PR)                 |
+| Phoebe      | k6 baseline script, sprint report, README, fixed `curl` in `restaurant/Dockerfile` for healthcheck | `k6/sprint-1.js`, `sprint-reports/SPRINT-1.md`, `README.md`, `restaurant/Dockerfile` | 863ac3e, fb63074, c4477aa, 8bdea6b, PR #15, PR #16 |
 
 Verify with:
 
