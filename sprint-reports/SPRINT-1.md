@@ -45,6 +45,7 @@ git log --author="Phoebe" --oneline -- k6/
 ## What Is Working
 
 - [x] `docker compose up` starts all services without errors
+- [x] `docker compose ps` shows every service as `(healthy)`
 - [x] `GET /health` on every service returns `200` with DB and Redis status
 - [x] At least one synchronous service-to-service call works end-to-end (`order-service` → `driver-service`)
 - [x] k6 baseline test runs with 0 errors, all thresholds pass
@@ -53,7 +54,6 @@ git log --author="Phoebe" --oneline -- k6/
 
 ## What Is Not Working / Cut
 
-- `docker compose ps` was showing `order-service` and `restaurant-service` as `(unhealthy)`. The issue was that `curl` was not installed in those Node images, so Docker's internal healthcheck failed even though both services respond correctly. Fixed by adding `RUN apk add --no-cache curl` to the Dockerfiles.
 - `GET /restaurants` returns hardcoded placeholder data, not real database rows. Proper DB-backed routes are planned for Sprint 2.
 - `preparation-tracker`, `delivery-tracker`, `order-dispatch`, and `notification-worker` were not started this sprint. Sprint 1 focused on starting the three core services.
 
