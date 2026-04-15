@@ -53,7 +53,7 @@ git log --author="Phoebe" --oneline -- k6/
 
 ## What Is Not Working / Cut
 
-- `docker compose ps` shows `order-service` and `restaurant-service` as `(unhealthy)`, even though both respond correctly to `GET /health`. The issue is that the healthcheck in `compose.yml` runs `curl -f http://localhost:<port>/health` inside the container, but `curl` is not installed in those Node images. The services work fine — Docker just can't run its own check. ----> Fixed now
+- `docker compose ps` was showing `order-service` and `restaurant-service` as `(unhealthy)`. The issue was that `curl` was not installed in those Node images, so Docker's internal healthcheck failed even though both services respond correctly. Fixed by adding `RUN apk add --no-cache curl` to the Dockerfiles.
 - `GET /restaurants` returns hardcoded placeholder data, not real database rows. Proper DB-backed routes are planned for Sprint 2.
 - `preparation-tracker`, `delivery-tracker`, `order-dispatch`, and `notification-worker` were not started this sprint. Sprint 1 focused on starting the three core services.
 
@@ -111,5 +111,5 @@ These are our baseline numbers. Sprint 2 Redis caching on `/restaurants` should 
 ## Blockers and Lessons Learned
 
 - **Curl not in the Node images**: We did not notice the `(unhealthy)` status in `docker compose ps`. The services respond fine from outside, but Docker's internal healthcheck can't run because `curl` isn't installed. Adding it to the Dockerfiles fixed the issue.
-- **Reverted health endpoint**: Ashley's initial order-service health endpoint was reverted (commit `504c9e8`) due to a conflict with in-progress changes on the branch. It took some time re-implementing it. Smaller, more focused PRs would prevent this.
+- **Reverted health endpoint**: The order-service health endpoint had to be reverted mid-sprint due to a branch conflict and was re-implemented shortly after. Smaller, more focused PRs would help avoid this in the future.
 - **Placeholder data**: We underestimated how much time proper DB schema design takes, so we shipped hardcoded data for `/restaurants` to avoid blocking the rest of the system. Real routes are the first priority in Sprint 2.
