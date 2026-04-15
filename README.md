@@ -1,23 +1,24 @@
 # Team 2 — Food Delivery Coordination
 
 **Course:** COMPSCI 426  
-**Team:** Eva Choudhury, Gianna Leidich, Jada Tu, Ashley Kang, Nivaan Gupta, Aryan Deshpande, Ayaan Sattar
-**System:** Food Delivery
+**Team:** Eva Choudhury, Gianna Leidich, Jada Tu, Ashley Kang, Nivaan Gupta, Aryan Deshpande, Ayaan Sattar, Phoebe Lo  
+**System:** Food Delivery  
 **Repository:** https://github.com/aryand15/team-2-food-delivery
 
 ---
 
 ## Team and Service Ownership
 
-| Team Member | Services / Components Owned                            |
-| ----------- | ------------------------------------------------------ |
-| Nivan     | [e.g. `driver-service/`, `driver-db/`] |
-| Aryan    | [e.g. `order-service/`, `order-db/`]       |
-| Ayaan    | [e.g. `restaurant-service/`, `restaurant-db/`]         |
-| Eva    | [e.g. `redis`, `caddy`]         |
-| Jada    | [e.g. `preparation-tracker`, `delivery-tracker/`]         |
-| Ashley    | [e.g. `order-dispatch`]         |
-| Gianna    | [e.g. `notification-worker`]         |
+| Team Member | Services / Components Owned              |
+| ----------- | ---------------------------------------- |
+| Nivan       | `driver-service/`, `driver-db/`          |
+| Aryan       | `order-service/`, `order-db/`            |
+| Ayaan       | `restaurant-service/`                    |
+| Eva         | `compose.yml`, `redis`                   |
+| Jada        | `restaurant-service/`, `restaurant-db/`  |
+| Ashley      | `order-service/`                         |
+| Gianna      | `driver-service/`                        |
+| Phoebe      | `k6/`, `sprint-reports/`                 |
 
 > Ownership is verified by `git log --author`. Each person must have meaningful commits in the directories they claim.
 
@@ -45,14 +46,14 @@ docker compose exec holmes bash
 ### Base URLs (development)
 
 ```
-[your-service-name]    http://localhost:[port]
-[your-service-name]    http://localhost:[port]
-[worker-name]          http://localhost:[port]   (health endpoint only)
-holmes                 (no port — access via exec)
+order-service       http://localhost:3001
+driver-service      http://localhost:3002
+restaurant-service  http://localhost:3003
+holmes              (no port — access via exec)
 ```
 
 > From inside holmes, services are reachable by name:
-> `curl http://your-service:3000/health`
+> `curl http://order-service:3001/health`
 >
 > See [holmes/README.md](holmes/README.md) for a full tool reference.
 
@@ -60,8 +61,7 @@ holmes                 (no port — access via exec)
 
 ## System Overview
 
-[One paragraph describing what your system does and how the services interact.
-Include which service calls which, what queues exist, and how data flows.]
+Three microservices handle different parts of a food delivery platform. `order-service` manages order coordination and makes a live synchronous call to `driver-service` to fetch available drivers. `driver-service` manages driver data. `restaurant-service` manages restaurant listings. Each service has its own Postgres database and connects to a shared Redis instance for caching. All services communicate over an internal Docker network (`team-net`) and are wired together via `compose.yml`.
 
 ---
 
@@ -74,9 +74,9 @@ Include which service calls which, what queues exist, and how data flows.]
 
 ---
 
-### [Service Name]
+### order-service
 
-### GET /health
+#### GET /health
 
 ```
 GET /health
@@ -91,7 +91,7 @@ GET /health
 **Example request:**
 
 ```bash
-curl http://localhost:[port]/health
+curl http://localhost:3001/health
 ```
 
 **Example response (200):**
@@ -99,24 +99,166 @@ curl http://localhost:[port]/health
 ```json
 {
   "status": "healthy",
-  "db": "ok",
-  "redis": "ok"
+  "service": "order-service",
+  "timestamp": "2026-04-15T00:00:00.000Z",
+  "uptime_seconds": 120,
+  "checks": {
+    "database": { "status": "healthy", "latency_ms": 3 },
+    "redis": { "status": "healthy", "latency_ms": 1 }
+  }
 }
 ```
 
-**Example response (503):**
+#### GET /get-drivers
+
+```
+GET /get-drivers
+
+  Fetches the list of available drivers from driver-service.
+
+  Responses:
+    200  Driver list returned successfully
+```
+
+**Example request:**
+
+```bash
+curl http://localhost:3001/get-drivers
+```
+
+**Example response (200):**
 
 ```json
-{
-  "status": "unhealthy",
-  "db": "ok",
-  "redis": "error: connection refused"
-}
+[
+  { "id": 1, "name": "John Doe", "status": "available" },
+  { "id": 2, "name": "Jane Smith", "status": "busy" }
+]
 ```
 
 ---
 
-<!-- Add the rest of your endpoints below. One ### section per endpoint. -->
+### driver-service
+
+#### GET /health
+
+```
+GET /health
+
+  Returns the health status of this service and its dependencies.
+
+  Responses:
+    200  Service and all dependencies healthy
+    503  One or more dependencies unreachable
+```
+
+**Example request:**
+
+```bash
+curl http://localhost:3002/health
+```
+
+**Example response (200):**
+
+```json
+{
+  "status": "healthy",
+  "service": "driver-service",
+  "timestamp": "2026-04-15T00:00:00.000Z",
+  "uptime_seconds": 120,
+  "checks": {
+    "database": { "status": "healthy", "latency_ms": 3 },
+    "redis": { "status": "healthy", "latency_ms": 1 }
+  }
+}
+```
+
+#### GET /drivers
+
+```
+GET /drivers
+
+  Returns the list of drivers.
+
+  Responses:
+    200  Driver list returned successfully
+```
+
+**Example request:**
+
+```bash
+curl http://localhost:3002/drivers
+```
+
+**Example response (200):**
+
+```json
+[
+  { "id": 1, "name": "John Doe", "status": "available" },
+  { "id": 2, "name": "Jane Smith", "status": "busy" }
+]
+```
+
+---
+
+### restaurant-service
+
+#### GET /health
+
+```
+GET /health
+
+  Returns the health status of this service and its dependencies.
+
+  Responses:
+    200  Service and all dependencies healthy
+    503  One or more dependencies unreachable
+```
+
+**Example request:**
+
+```bash
+curl http://localhost:3003/health
+```
+
+**Example response (200):**
+
+```json
+{
+  "status": "healthy",
+  "service": "restaurant-service",
+  "timestamp": "2026-04-15T00:00:00.000Z",
+  "uptime_seconds": 120,
+  "checks": {
+    "database": { "status": "healthy", "latency_ms": 3 },
+    "redis": { "status": "healthy", "latency_ms": 1 }
+  }
+}
+```
+
+#### GET /restaurants
+
+```
+GET /restaurants
+
+  Returns the list of restaurants.
+
+  Responses:
+    200  Restaurant list returned successfully
+```
+
+**Example request:**
+
+```bash
+curl http://localhost:3003/restaurants
+```
+
+**Example response (200):**
+
+```json
+[
+  { "id": 1, "name": "Sample Restaurant", "cuisine": "Test Cuisine", "is_open": true }
+]
+```
 
 ---
 
