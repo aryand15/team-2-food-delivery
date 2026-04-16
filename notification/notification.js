@@ -62,6 +62,28 @@ app.get('/health', async (req, res) => {
         healthy = false; 
     }
 
+    // check that the worker is actually processing
+    const secondsSinceLastJob = lastJobAt
+    ? (Date.now() - new Date(lastJobAt).getTime()) / 1000
+    : null
+
+    checks.worker = {
+        status: secondsSinceLastJob === null || secondsSinceLastJob < 60
+        ? 'healthy'
+        : 'degraded',
+
+        last_job_at: lastJobAt ?? 'never',
+        jobs_processed: jobsProcessed,
+        seconds_since_last_job: secondsSinceLastJob
+    }
+
+    res.status(healthy ? 200 : 503).json({
+        status: healthy ? 'healthy': 'unhealthy',
+        service: process.env.SERVICE_NAME ?? 'worker',
+        timestamp: new Date().toISOString(),
+        uptime_seconds: Math.floor((Date.now() - startTime) / 1000),
+        checks
+    })
 
 })
 
