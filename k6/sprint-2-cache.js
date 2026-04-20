@@ -3,7 +3,7 @@ import { check, sleep } from "k6";
 import { Rate } from "k6/metrics";
 
 const errorRate = new Rate("errors");
-const TARGET_URL = "http://restaurant-service:3003/menu";
+const TARGET_URL = "http://restaurant-service:3003/restaurants/1/menu";
 
 export const options = {
   stages: [
