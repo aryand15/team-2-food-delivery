@@ -66,49 +66,51 @@ const getOrderByIdempotencyKey = async (idempotencyKey) => {
 app.post("/orders", async (req, res) => {
   const payload = req.body ?? {};
   const validation = validateOrderPayload(payload);
-  if (!validation.valid) {
-    return res.status(400).json({
-      error: validation.error
-    });
-  }
-  const { clientOrderId, item, quantity } = payload;
 
-  const insertOrderQuery = `
-    INSERT INTO orders (idempotency_key, item, quantity)
+  if (!validation.valid) {
+    return res.status(400).json({ error: validation.error });
+  }
+
+  const { clientOrderId, restaurantId, items } = payload;
+
+  // TODO: verify restaurantId and each item's menuItemId via the restaurant service
+  // once that service's schema is available.
+
+
+  const query = `
+    INSERT INTO orders (idempotency_key, restaurant_id, items)
     VALUES ($1, $2, $3)
+    ON CONFLICT (idempotency_key) DO NOTHING
     RETURNING *
   `;
 
   try {
-    const insertResult = await pool.query(insertOrderQuery, [
+    const insertResult = await pool.query(query, [
       clientOrderId,
-      item,
-      quantity
+      restaurantId,
+      JSON.stringify(items)
     ]);
-    const createdOrder = insertResult.rows[0];
-
-    await redis.lPush("orders:queue", JSON.stringify(createdOrder));
-
-    return res.status(201).json({
-      message: "Order accepted",
-      order: createdOrder
-    });
-  } catch (err) {
-    if (err.code === '23505') {
-      const existingOrder = await getOrderByIdempotencyKey(clientOrderId);
-
-      if (!existingOrder) {
-        return res.status(500).json({
-          message: "Order conflict detected but existing order could not be loaded"
-        });
+    let order;
+    if (insertResult.rows.length > 0) {
+      order = insertResult.rows[0];
+      try {
+        await redis.lPush("orders:queue", JSON.stringify(order));
+      } catch (e) {
+        console.error("Redis enqueue failed:", e);
       }
+      return res.status(201).json({
+        message: "Order accepted",
+        order
+      });
+    } else {
+      order = await getOrderByIdempotencyKey(clientOrderId);
 
       return res.status(200).json({
         message: "Duplicate order",
-        order: existingOrder
+        order
       });
     }
-
+  } catch (err) {
     return res.status(500).json({
       message: "Internal server error",
       error: err.message
