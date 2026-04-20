@@ -8,7 +8,9 @@
 
 ## What We Built
 
-[What cache did you add? What queue and worker are running? What does the async pipeline do?]
+- Cache: ...
+- Queue and worker: We implemented the order queue and order dispatch worker. The async pipeline pushes an order to the order queue, which is received by the order dispatch worker. 
+- Async pipeline: We use an async pipeline for the order queue. (See above.)
 
 ---
 
@@ -16,23 +18,30 @@
 
 | Team Member | What They Delivered | Key Commits |
 | ----------- | ------------------- | ----------- |
-| [Name]      | | |
-| [Name]      | | |
-| [Name]      | | |
+| Gianna      | notification worker, health endpoint, queue checks, documentation | 38ce8c2, 00311d3, 6694a85, 13f687f |
+| Jada      | N/A | N/A |
+| Phoebe      | N/A | N/A |
+| Nivaan      | rating service, rating database, surge pricing worker, pricing database, health endpoints | 5f39d35, d727837 |
+| Ashley      | redis consumer health endpoint, queue checks, pr #20, #22, #23 | 385902a, 2247eeb |
+| Aryan      | postgres database, idempotent POST orders endpoint, env variable fix | 48201b4, 86e3ce4, f4b64a5 |
+| Ayaan      | menu endpoint | 0974a5a | 
+| Eva      | pr #18, #19, #21 | N/A |
 
 ---
 
 ## What Is Working
 
-- [ ] Redis cache in use — repeated reads do not hit the database
-- [ ] Async pipeline works end-to-end (message published → worker consumes → action taken)
-- [ ] At least one write path is idempotent (same request twice produces same result)
-- [ ] Worker logs show pipeline activity in `docker compose logs`
-- [ ] Worker `GET /health` returns queue depth, DLQ depth, and last-job-at
+- [x] Redis cache in use — repeated reads do not hit the database
+- [x] Async pipeline works end-to-end (message published → worker consumes → action taken)
+- [x] At least one write path is idempotent (same request twice produces same result)
+- [x] Worker logs show pipeline activity in `docker compose logs`
+- [x] Worker `GET /health` returns queue depth, DLQ depth, and last-job-at
 
 ---
 
 ## What Is Not Working / Cut
+
+Still have not implemented actual functionality (still using placeholder data).
 
 ---
 
