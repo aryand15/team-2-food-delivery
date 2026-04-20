@@ -18,7 +18,7 @@
 | Jada        | `restaurant-service/`, `restaurant-db/`  |
 | Ashley      | `order-service/`                         |
 | Gianna      | `driver-service/`                        |
-| Phoebe      | `k6/`, `sprint-reports/`                 |
+| Phoebe      | `delivery-tracker-worker/`               |
 
 > Ownership is verified by `git log --author`. Each person must have meaningful commits in the directories they claim.
 
@@ -50,8 +50,9 @@ order-service         http://localhost:3001
 driver-service        http://localhost:3002
 restaurant-service    http://localhost:3003
 rating-service        http://localhost:3004
-surge-pricing-worker  http://localhost:3005
-holmes                (no port — access via exec)
+surge-pricing-worker      http://localhost:3005
+delivery-tracker-worker   http://localhost:3006
+holmes                    (no port — access via exec)
 ```
 
 > From inside holmes, services are reachable by name:
@@ -427,6 +428,63 @@ curl http://localhost:3005/health
   "checks": {
     "database": { "status": "healthy" },
     "redis": { "status": "healthy" }
+  }
+}
+```
+
+---
+
+### delivery-tracker-worker
+
+Background worker that consumes delivery jobs from a Redis list (`deliveries:queue`). Logs structured output for each job received. Malformed messages go to the dead-letter queue (`deliveries:queue:dlq`).
+
+Push a test job (from holmes or your host):
+
+```bash
+redis-cli -h redis LPUSH deliveries:queue '{"id":"job-1"}'
+```
+
+#### GET /health
+
+```
+GET /health
+
+  Returns the worker's health plus live queue stats.
+
+  Responses:
+    200  Worker and Redis healthy
+    503  Redis unreachable
+
+  Body fields:
+    queue          the list being consumed
+    queue_depth    current depth of the work queue
+    dlq_depth      current depth of the dead-letter queue
+    last_job_at    ISO timestamp of the most recently completed job
+                   (null until the first job is handled)
+    jobs_processed total count of jobs processed since startup
+```
+
+**Example request:**
+
+```bash
+curl http://localhost:3006/health
+```
+
+**Example response (200):**
+
+```json
+{
+  "status": "healthy",
+  "service": "delivery-tracker-worker",
+  "timestamp": "2026-04-20T00:00:00.000Z",
+  "uptime_seconds": 120,
+  "queue": "deliveries:queue",
+  "queue_depth": 0,
+  "dlq_depth": 0,
+  "last_job_at": null,
+  "jobs_processed": 0,
+  "checks": {
+    "redis": { "status": "healthy", "latency_ms": 1 }
   }
 }
 ```

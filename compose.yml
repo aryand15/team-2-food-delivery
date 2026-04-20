@@ -187,6 +187,29 @@ services:
       start_period: 15s
 
 
+  delivery-tracker-worker:
+    build: ./delivery-tracker-worker
+    container_name: delivery-tracker-worker
+    restart: unless-stopped
+    ports:
+      - "3006:3006"
+    networks:
+      - team-net
+    environment:
+      PORT: 3006
+      SERVICE_NAME: delivery-tracker-worker
+      REDIS_URL: redis://redis:6379
+      QUEUE_NAME: deliveries:queue
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3006/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
   # ── Postgres DB's  ──────────────────────────────────────────────────────
   order-db:
     image: postgres:16
