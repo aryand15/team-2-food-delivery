@@ -1,0 +1,14 @@
+{
+  "name": "notification-worker",
+  "version": "1.0.0",
+  "main": "notification.js",
+  "type": "module",
+  "scripts": {
+    "start": "node notification.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "pg": "^8.11.3",
+    "redis": "^4.6.10"
+  }
+}
