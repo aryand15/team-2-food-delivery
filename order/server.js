@@ -1,6 +1,7 @@
 import express from 'express'
 import pg from 'pg'
 import { createClient } from 'redis'
+import { validateOrderPayload } from "./order-utils.js";
 
 const app = express()
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL })
@@ -8,6 +9,8 @@ const redis = createClient({ url: process.env.REDIS_URL })
 await redis.connect()
 
 const startTime = Date.now()
+
+app.use(express.json());
 
 app.get('/health', async (req, res) => {
   const checks = {}
@@ -51,6 +54,69 @@ app.get('/get-drivers', async (req, res) => {
     const data = await response.json();
     res.json(data);
 })
+
+const getOrderByIdempotencyKey = async (idempotencyKey) => {
+  const result = await pool.query(
+    'SELECT * FROM orders WHERE idempotency_key = $1 LIMIT 1',
+    [idempotencyKey]
+  );
+  return result.rows[0] ?? null;
+};
+
+app.post("/orders", async (req, res) => {
+  const payload = req.body ?? {};
+  const validation = validateOrderPayload(payload);
+
+  if (!validation.valid) {
+    return res.status(400).json({ error: validation.error });
+  }
+
+  const { clientOrderId, restaurantId, items } = payload;
+
+  // TODO: verify restaurantId and each item's menuItemId via the restaurant service
+  // once that service's schema is available.
+
+
+  const query = `
+    INSERT INTO orders (idempotency_key, restaurant_id, items)
+    VALUES ($1, $2, $3)
+    ON CONFLICT (idempotency_key) DO NOTHING
+    RETURNING *
+  `;
+
+  try {
+    const insertResult = await pool.query(query, [
+      clientOrderId,
+      restaurantId,
+      JSON.stringify(items)
+    ]);
+    let order;
+    if (insertResult.rows.length > 0) {
+      order = insertResult.rows[0];
+      try {
+        await redis.lPush("orders:queue", JSON.stringify(order));
+      } catch (e) {
+        console.error("Redis enqueue failed:", e);
+      }
+      return res.status(201).json({
+        message: "Order accepted",
+        order
+      });
+    } else {
+      order = await getOrderByIdempotencyKey(clientOrderId);
+
+      return res.status(200).json({
+        message: "Duplicate order",
+        order
+      });
+    }
+  } catch (err) {
+    return res.status(500).json({
+      message: "Internal server error",
+      error: err.message
+    });
+  }
+});
 
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => {

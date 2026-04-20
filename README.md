@@ -46,10 +46,12 @@ docker compose exec holmes bash
 ### Base URLs (development)
 
 ```
-order-service       http://localhost:3001
-driver-service      http://localhost:3002
-restaurant-service  http://localhost:3003
-holmes              (no port — access via exec)
+order-service         http://localhost:3001
+driver-service        http://localhost:3002
+restaurant-service    http://localhost:3003
+rating-service        http://localhost:3004
+surge-pricing-worker  http://localhost:3005
+holmes                (no port — access via exec)
 ```
 
 > From inside holmes, services are reachable by name:
@@ -258,6 +260,175 @@ curl http://localhost:3003/restaurants
 [
   { "id": 1, "name": "Sample Restaurant", "cuisine": "Test Cuisine", "is_open": true }
 ]
+```
+
+---
+
+### rating-service
+
+#### GET /health
+
+```
+GET /health
+
+  Returns the health status of this service and its dependencies.
+
+  Responses:
+    200  Service and all dependencies healthy
+    503  One or more dependencies unreachable
+```
+
+**Example request:**
+
+```bash
+curl http://localhost:3004/health
+```
+
+**Example response (200):**
+
+```json
+{
+  "status": "healthy",
+  "service": "rating-service",
+  "timestamp": "2026-04-18T00:00:00.000Z",
+  "uptime_seconds": 120,
+  "checks": {
+    "database": { "status": "healthy", "latency_ms": 3 },
+    "redis": { "status": "healthy", "latency_ms": 1 }
+  }
+}
+```
+
+#### POST /ratings
+
+```
+POST /ratings
+
+  Accepts a post-delivery rating. Validates the order via a synchronous call to
+  order-service, stores the rating in rating-db, and publishes a
+  "rating:submitted" event on Redis pub/sub.
+
+  Request body (application/json):
+    order_id       string   required
+    restaurant_id  integer  required
+    customer_id    string   required
+    rating         integer  required, 1–5
+    review         string   optional
+
+  Responses:
+    201  Rating stored and event published
+    400  Invalid payload or order not completed
+    503  order-service unreachable
+```
+
+**Example request:**
+
+```bash
+curl -X POST http://localhost:3004/ratings \
+  -H "Content-Type: application/json" \
+  -d '{"order_id":"ord-123","restaurant_id":1,"customer_id":"cust-7","rating":5,"review":"Great food"}'
+```
+
+**Example response (201):**
+
+```json
+{
+  "id": 1,
+  "order_id": "ord-123",
+  "restaurant_id": 1,
+  "customer_id": "cust-7",
+  "rating": 5,
+  "review": "Great food",
+  "created_at": "2026-04-18T00:00:00.000Z"
+}
+```
+
+#### GET /rankings
+
+```
+GET /rankings
+
+  Returns restaurants ranked by average rating, aggregated across all stored
+  ratings.
+
+  Responses:
+    200  Ranking list returned successfully
+```
+
+**Example request:**
+
+```bash
+curl http://localhost:3004/rankings
+```
+
+**Example response (200):**
+
+```json
+[
+  { "restaurant_id": 1, "average_rating": "4.75", "total_ratings": "4" },
+  { "restaurant_id": 2, "average_rating": "3.50", "total_ratings": "2" }
+]
+```
+
+---
+
+### surge-pricing-worker
+
+Background worker that consumes order-volume events from a Redis list
+(`orders:volume`) and writes surge periods to `pricing-db` when a restaurant's
+order count crosses `SURGE_THRESHOLD`. Activating a surge publishes a
+`surge:active` event on Redis pub/sub. Idempotent — duplicate `event_id`s are
+skipped. Malformed events go to the dead-letter queue (`orders:volume:dlq`).
+
+Push a test event (from holmes or your host):
+
+```bash
+redis-cli -h redis LPUSH orders:volume \
+  '{"event_id":"evt-1","restaurant_id":1,"order_count":12}'
+```
+
+#### GET /health
+
+```
+GET /health
+
+  Returns the worker's health plus live queue stats.
+
+  Responses:
+    200  Worker, DB, and Redis all healthy
+    503  DB or Redis unreachable
+
+  Body fields:
+    queue              the list being consumed
+    queue_depth        current LLEN of the work queue
+    dlq_depth          current LLEN of the dead-letter queue
+    last_processed_at  ISO timestamp of the most recently completed job
+                       (null until the first event is handled)
+```
+
+**Example request:**
+
+```bash
+curl http://localhost:3005/health
+```
+
+**Example response (200):**
+
+```json
+{
+  "status": "healthy",
+  "service": "surge-pricing-worker",
+  "timestamp": "2026-04-20T00:00:00.000Z",
+  "uptime_seconds": 120,
+  "queue": "orders:volume",
+  "queue_depth": 0,
+  "dlq_depth": 0,
+  "last_processed_at": "2026-04-20T00:00:00.000Z",
+  "checks": {
+    "database": { "status": "healthy" },
+    "redis": { "status": "healthy" }
+  }
+}
 ```
 
 ---
