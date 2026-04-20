@@ -140,6 +140,7 @@ services:
       POSTGRES_DB: orderdb
     volumes:
       - order-db:/var/lib/postgresql/data
+      - ./order/init:/docker-entrypoint-initdb.d
     networks:
       - team-net
     healthcheck:
