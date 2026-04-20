@@ -94,7 +94,7 @@ app.post("/orders", async (req, res) => {
     if (insertResult.rows.length > 0) {
       order = insertResult.rows[0];
       try {
-        await redis.lPush("orders:queue", JSON.stringify(order));
+        await redis.lPush(process.env.QUEUE_NAME, JSON.stringify(order));
       } catch (e) {
         console.error("Redis enqueue failed:", e);
       }
