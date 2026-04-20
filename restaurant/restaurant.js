@@ -1,14 +1,16 @@
 const express = require("express");
 const { Pool } = require("pg");
 const { createClient } = require("redis");
+const mockData = require("./mock-data.json");
 
 const app = express();
 const PORT = process.env.PORT || 3003;
 const SERVICE_NAME = process.env.SERVICE_NAME || "restaurant";
+const MENU_CACHE_TTL_SECONDS = 60;
 const startedAt = Date.now();
 
 const databaseUrl = process.env.DATABASE_URL;
-const redisUrl = process.env.REDIS_URL;
+const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
 
 const pool = databaseUrl ? new Pool({ connectionString: databaseUrl }) : null;
 const redis = redisUrl ? createClient({ url: redisUrl }) : null;
@@ -27,14 +29,51 @@ app.get("/", (req, res) => {
 
 // Temporary restaurants endpoint (replace with DB-backed routes later)
 app.get("/restaurants", (req, res) => {
-  res.json([
-    {
-      id: 1,
-      name: "Sample Restaurant",
-      cuisine: "Test Cuisine",
-      is_open: true
+  res.json(mockData.restaurants);
+});
+
+app.get("/restaurants/:id/menu", async (req, res) => {
+  const restaurantId = Number.parseInt(req.params.id, 10);
+
+  if (Number.isNaN(restaurantId)) {
+    return res.status(400).json({ error: "Invalid restaurant id" });
+  }
+
+  const cacheKey = `restaurant:${restaurantId}:menu`;
+
+  if (redis) {
+    try {
+      const cachedMenu = await redis.get(cacheKey);
+      if (cachedMenu) {
+        return res.json(JSON.parse(cachedMenu));
+      }
+    } catch (error) {
+      console.error("Failed to read menu from Redis:", error.message || String(error));
     }
-  ]);
+  }
+
+  const menuItems = mockData.menus[String(restaurantId)];
+
+  if (!menuItems) {
+    return res.status(404).json({ error: "Menu not found for restaurant" });
+  }
+
+  const responseBody = {
+    restaurant_id: restaurantId,
+    items: menuItems
+  };
+
+  if (redis) {
+    try {
+      await redis.set(cacheKey, JSON.stringify(responseBody), {
+        EX: MENU_CACHE_TTL_SECONDS
+      });
+    } catch (error) {
+      console.error("Failed to write menu to Redis:", error.message || String(error));
+    }
+  }
+
+  return res.json(responseBody);
 });
 
 app.get("/health", async (req, res) => {
