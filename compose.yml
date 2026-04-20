@@ -127,7 +127,65 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
-  
+
+  rating-service:
+    build: ./rating
+    container_name: rating-service
+    restart: unless-stopped
+    ports:
+      - "3004:3004"
+    networks:
+      - team-net
+    environment:
+      PORT: 3004
+      SERVICE_NAME: rating-service
+      DATABASE_URL: postgres://user:pass@rating-db:5432/ratingdb
+      REDIS_URL: redis://redis:6379
+      ORDER_SERVICE_URL: http://order-service:3001
+    depends_on:
+      rating-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3004/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  surge-pricing-worker:
+    build: ./surge
+    container_name: surge-pricing-worker
+    restart: unless-stopped
+    ports:
+      - "3005:3005"
+    networks:
+      - team-net
+    environment:
+      PORT: 3005
+      SERVICE_NAME: surge-pricing-worker
+      DATABASE_URL: postgres://user:pass@pricing-db:5432/pricingdb
+      REDIS_URL: redis://redis:6379
+      QUEUE_NAME: orders:volume
+      SURGE_CHANNEL: surge:active
+      SURGE_THRESHOLD: "10"
+      SURGE_MULTIPLIER: "1.5"
+      SURGE_DURATION_SECONDS: "300"
+    depends_on:
+      pricing-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3005/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
 
   # ── Postgres DB's  ──────────────────────────────────────────────────────
   order-db:
@@ -184,7 +242,43 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
-  
+
+  rating-db:
+    image: postgres:16
+    container_name: rating-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: ratingdb
+    volumes:
+      - rating-db:/var/lib/postgresql/data
+    networks:
+      - team-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d ratingdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  pricing-db:
+    image: postgres:16
+    container_name: pricing-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: pricingdb
+    volumes:
+      - pricing-db:/var/lib/postgresql/data
+    networks:
+      - team-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d pricingdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   # ── Redis template ─────────────────────────────────────────────────────────
   
   redis:
@@ -206,5 +300,7 @@ volumes:
   order-db:
   driver-db:
   restaurant-db:
+  rating-db:
+  pricing-db:
 
 
