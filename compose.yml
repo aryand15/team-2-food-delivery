@@ -235,6 +235,30 @@ services:
       retries: 3
       start_period: 15s
 
+  preparation-tracker-worker:
+    build: ./preparation-tracker-worker
+    container_name: preparation-tracker-worker
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    networks:
+      - team-net
+    environment:
+      PORT: 8082
+      SERVICE_NAME: preparation-tracker-worker
+      REDIS_URL: redis://redis:6379
+      ORDER_DISPATCHED_CHANNEL: order:dispatched
+      ORDER_READY_CHANNEL: order:ready
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
 
   # ── Postgres DB's  ──────────────────────────────────────────────────────
   order-db:
