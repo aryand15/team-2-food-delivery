@@ -88,3 +88,5 @@ app.get('/health', async (req, res) => {
 })
 
 app.listen(process.env.PORT ?? 8081)
+
+// need to add posion pill handling
