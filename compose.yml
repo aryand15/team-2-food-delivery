@@ -65,6 +65,7 @@ services:
       SERVICE_NAME: order-service
       DATABASE_URL: postgres://user:pass@order-db:5432/orderdb
       REDIS_URL: redis://redis:6379
+      QUEUE_NAME: orders:queue
     depends_on:
       order-db:
         condition: service_healthy
@@ -186,6 +187,102 @@ services:
       retries: 3
       start_period: 15s
 
+  order-dispatch-worker:
+    build: ./order-dispatch-worker
+    container_name: order-dispatch-worker
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    networks:
+      - team-net
+    environment:
+      PORT: 8080
+      SERVICE_NAME: order-dispatch-worker
+      REDIS_URL: redis://redis:6379
+      QUEUE_NAME: orders:queue
+      DLQ_NAME: orders:dlq
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  notification-worker:
+    build: ./notification
+    container_name: notification-worker
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    networks:
+      - team-net
+    environment:
+      PORT: 8081
+      SERVICE_NAME: notification-worker
+      REDIS_URL: redis://redis:6379
+      QUEUE_NAME: notifications:queue
+      DLQ_NAME: notifications:queue:dlq
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  preparation-tracker-worker:
+    build: ./preparation-tracker-worker
+    container_name: preparation-tracker-worker
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    networks:
+      - team-net
+    environment:
+      PORT: 8082
+      SERVICE_NAME: preparation-tracker-worker
+      REDIS_URL: redis://redis:6379
+      ORDER_DISPATCHED_CHANNEL: order:dispatched
+      ORDER_READY_CHANNEL: order:ready
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  delivery-tracker-worker:
+    build: ./delivery-tracker-worker
+    container_name: delivery-tracker-worker
+    restart: unless-stopped
+    ports:
+      - "3006:3006"
+    networks:
+      - team-net
+    environment:
+      PORT: 3006
+      SERVICE_NAME: delivery-tracker-worker
+      REDIS_URL: redis://redis:6379
+      QUEUE_NAME: deliveries:queue
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3006/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+
 
   # ── Postgres DB's  ──────────────────────────────────────────────────────
   order-db:
@@ -302,5 +399,6 @@ volumes:
   restaurant-db:
   rating-db:
   pricing-db:
+
 
 

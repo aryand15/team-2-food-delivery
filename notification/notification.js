@@ -25,7 +25,7 @@ app.get('/health', async (req, res) => {
         await redis.ping()
         checks.redis = {
             status: 'healthy',
-            latency_ms = Date.now() - redisStart
+            latency_ms: Date.now() - redisStart
         }
         // healthy still true
     } catch (err) {
@@ -87,4 +87,4 @@ app.get('/health', async (req, res) => {
 
 })
 
-app.listen(process.env.PORT ?? 8080)
+app.listen(process.env.PORT ?? 8081)
