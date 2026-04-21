@@ -5,8 +5,10 @@ import { Counter, Rate } from "k6/metrics";
 const errorRate = new Rate("errors");
 const acceptedWrites = new Counter("accepted_writes");
 const duplicateChecks = new Counter("duplicate_checks");
+const workerHealthChecks = new Counter("worker_health_checks");
 
 const ORDER_URL = "http://order-service:3001/orders";
+const WORKER_HEALTH_URL = "http://order-dispatch-worker:8080/health";
 
 export const options = {
   scenarios: {
@@ -24,6 +26,13 @@ export const options = {
       startTime: "2s",
       maxDuration: "15s",
       exec: "checkDuplicateHandling",
+    },
+    worker_health_polling: {
+      executor: "constant-vus",
+      vus: 1,
+      duration: "20s",
+      startTime: "1s",
+      exec: "pollWorkerHealth",
     },
   },
   thresholds: {
@@ -106,11 +115,11 @@ export function checkDuplicateHandling() {
       secondBody &&
       firstBody.order &&
       secondBody.order &&
-      firstBody.order.client_order_id &&
-      secondBody.order.client_order_id
+      firstBody.order.idempotency_key &&
+      secondBody.order.idempotency_key
     ) {
       sameStoredOrder =
-        firstBody.order.client_order_id === secondBody.order.client_order_id;
+        firstBody.order.idempotency_key === secondBody.order.idempotency_key;
     }
   } catch (_) {
     sameStoredOrder = true;
@@ -126,6 +135,46 @@ export function checkDuplicateHandling() {
 
   duplicateChecks.add(1);
   errorRate.add(!duplicateHandled);
+}
+
+export function pollWorkerHealth() {
+  const res = http.get(WORKER_HEALTH_URL);
+
+  const reachable = check(res, {
+    "worker health endpoint reachable": (r) => r.status === 200 || r.status === 503,
+  });
+
+  if (!reachable) {
+    errorRate.add(true);
+    sleep(1);
+    return;
+  }
+
+  let parsed = null;
+  try {
+    parsed = res.json();
+  } catch (_) {
+    errorRate.add(true);
+    sleep(1);
+    return;
+  }
+
+  const ok = check(parsed, {
+    "worker health has checks": (b) => !!b.checks,
+    "worker health has queue info": (b) =>
+      !!b.checks && !!b.checks.queue && typeof b.checks.queue.depth !== "undefined",
+    "worker health has dlq info": (b) =>
+      !!b.checks && !!b.checks.queue && typeof b.checks.queue.dlq_depth !== "undefined",
+    "worker health has worker info": (b) =>
+      !!b.checks && !!b.checks.worker && typeof b.checks.worker.jobs_processed !== "undefined",
+    "worker health reports last_job_at": (b) =>
+      !!b.checks && !!b.checks.worker && typeof b.checks.worker.last_job_at !== "undefined",
+  });
+
+  workerHealthChecks.add(1);
+  errorRate.add(!ok);
+
+  sleep(1);
 }
 
 export default function () {
