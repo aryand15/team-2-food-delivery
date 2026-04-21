@@ -71,7 +71,6 @@ The queues that will get DLQ handling are:
 
 - [ ] Implement poison pill k6 test
 - [ ] documentation in sprint 3 report
-- [ ] implement caddy
 
 ---
 
