@@ -65,6 +65,7 @@ services:
       SERVICE_NAME: order-service
       DATABASE_URL: postgres://user:pass@order-db:5432/orderdb
       REDIS_URL: redis://redis:6379
+      QUEUE_NAME: orders:queue
     depends_on:
       order-db:
         condition: service_healthy
@@ -186,6 +187,54 @@ services:
       retries: 3
       start_period: 15s
 
+  order-dispatch-worker:
+    build: ./order-dispatch-worker
+    container_name: order-dispatch-worker
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    networks:
+      - team-net
+    environment:
+      PORT: 8080
+      SERVICE_NAME: order-dispatch-worker
+      REDIS_URL: redis://redis:6379
+      QUEUE_NAME: orders:queue
+      DLQ_NAME: orders:dlq
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  notification-worker:
+    build: ./notification
+    container_name: notification-worker
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    networks:
+      - team-net
+    environment:
+      PORT: 8081
+      SERVICE_NAME: notification-worker
+      REDIS_URL: redis://redis:6379
+      QUEUE_NAME: notifications:queue
+      DLQ_NAME: notifications:queue:dlq
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
 
   # ── Postgres DB's  ──────────────────────────────────────────────────────
   order-db:
@@ -302,5 +351,6 @@ volumes:
   restaurant-db:
   rating-db:
   pricing-db:
+
 
 
