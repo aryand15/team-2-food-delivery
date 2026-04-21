@@ -4,4 +4,5 @@ COPY package*.json ./
 RUN apk add --no-cache curl
 RUN npm install
 COPY . .
+EXPOSE 3006
 CMD ["npm", "start"]
