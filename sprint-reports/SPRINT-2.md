@@ -166,3 +166,5 @@ Idempotency check: We sent the same order payload twice using the same clientOrd
 ---
 
 ## Blockers and Lessons Learned
+
+We learned that we should start our work early since there are so many dependencies in these Sprints. It is much easier to work incrementally through the week rather than all at once. Also asking for help from our teammates is a lesson we all learned when we were struggling instead of taking longer periods of time to complete tasks.
