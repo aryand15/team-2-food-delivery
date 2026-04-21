@@ -3,7 +3,10 @@ import { createClient } from 'redis'
  
 const app = express()
 const redis = createClient({ url: process.env.REDIS_URL })
+const healthRedis = createClient({ url: process.env.REDIS_URL })
+
 await redis.connect()
+await healthRedis.connect()
  
 const startTime = Date.now()
 let lastJobAt = null
@@ -16,7 +19,7 @@ app.get('/health', async (req, res) => {
     // Check Redis
     const redisStart = Date.now()
     try {
-        await redis.ping()
+        await healthRedis.ping()
         checks.redis = {
             status: 'healthy',
             latency_ms: Date.now() - redisStart
@@ -31,8 +34,8 @@ app.get('/health', async (req, res) => {
  
     // Check queue depth
     try {
-        const depth = await redis.lLen(process.env.QUEUE_NAME ?? 'orders:queue')
-        const dlqDepth = await redis.lLen(process.env.DLQ_NAME ?? 'orders:dlq')
+        const depth = await healthRedis.lLen(process.env.QUEUE_NAME ?? 'orders:queue')
+        const dlqDepth = await healthRedis.lLen(process.env.DLQ_NAME ?? 'orders:dlq')
         checks.queue = {
             status: depth < 1000 && dlqDepth === 0 ? 'healthy' : 'degraded',
             depth,
