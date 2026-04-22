@@ -1,15 +1,91 @@
 import express from 'express'
 import { createClient } from 'redis'
 
-// server and redis setup 
 const app = express()
 
-const redisUrl = process.env.REDIS_URL;
+// config not changing here
+// maybe add or later
+const config = {
+    redisUrl: process.env.REDIS_URL,
+    queueName: process.env.QUEUE_NAME,
+    pipeline: process.env.PIPELINE,
+    mode: process.env.MODE,
+    minMs: Number(process.env.WORK_SIM_MIN_MS),
+    maxMs: Number(process.env.WORK_SIM_MAX_MS),
+    ttlSec: Number(process.env.IDEM_TTL_SEC),
+    maxRetries: Number(process.env.MAX_RETRIES),
+    dlqName: process.env.DLQ_NAME,
+    retryBaseMs: Number(process.env.RETRY_BASE_MS)
+}
 
-
-const redis = createClient({ url: redisUrl })
-
+// set up redis
+const redis = createClient({ url: config.redisUrl })
 await redis.connect()
+
+const keys = {
+    job: (jobId) => `job:${config.pipeline}:${jobId}`,
+    effect: (jobId) => `effect:${config.pipeline}:${jobId}`,
+    processed: (jobId) => `processed:${config.pipeline}:${jobId}`,
+    totalEffects: () => `effects-total:${config.pipeline}`,
+    dlqTotal: () => `dlq-total:${config.pipeline}`
+}
+
+// structure redis or dlq writes
+const JobStatus = (status, fields = {}) => ({
+    status,
+    updatedAt: new Date().toISOString(),
+    fields
+})
+
+const DLQEntry = (job, reason) => ({
+    ...job,
+    dlqReason: reason,
+    dlqAt: new Date().toISOString(),
+    pipeline: config.pipeline
+})
+
+const RetryJob = (job, attempt) => ({
+    ...job,
+    retryAttempt: attempt
+})
+
+// util functs
+const sleep = (ms) => new Promise((res) => setTimeout(resolve, ms))
+const randomDelayMs = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
+
+// worker functs
+
+const applySideEffect = async (jobId) => { // throw on poison pill 
+    if (jobId.includes("poison"))
+        throw new Error(`poison-pill job rejected: ${jobId}`)
+
+    const delayMs = randomDelayMs(config.minMs, config.maxMs);
+    await sleep(delayMs);
+    const effectCount = await client.incr(keys.effect(jobId));
+    await client.expire(keys.effect(jobId), config.ttlSec);
+    await client.incr(keys.totalEffects());
+    await client.expire(keys.totalEffects(), config.ttlSec);
+    return { delayMs, effectCount };
+}
+
+const sendToDlq = async (job, reason) => { // move to dlq
+    await client.lPush(config.dlqName, JSON.stringify(DLQEntry(job, reason)));
+    await client.incr(keys.dlqTotal());
+    await client.expire(keys.dlqTotal(), config.ttlSec);
+
+    await client.hSet(
+        keys.job(job.jobId),
+        JobStatus("dead-lettered", { dlqReason: reason }),
+    );
+
+    console.log(
+        `pipeline=${config.pipeline} mode=${config.mode} job=${job.jobId} status=dead-lettered reason="${reason}"`,
+    );
+};
+
+
+
+
 
 const startTime = Date.now()
 let lastJobAt = null
@@ -19,6 +95,12 @@ export function recordJobProcessed() {
     lastJobAt = new Date().toISOString()
     jobsProcessed += 1
 }
+
+
+
+
+
+
 
 app.get('/health', async (req, res) => {
     const checks = {}
