@@ -3,7 +3,12 @@ import { createClient } from 'redis'
 
 // server and redis setup 
 const app = express()
-const redis = createClient({ url: process.env.REDIS_URL })
+
+const redisUrl = process.env.REDIS_URL;
+
+
+const redis = createClient({ url: redisUrl })
+
 await redis.connect()
 
 const startTime = Date.now()
@@ -89,4 +94,3 @@ app.get('/health', async (req, res) => {
 
 app.listen(process.env.PORT ?? 8081)
 
-// need to add posion pill handling
