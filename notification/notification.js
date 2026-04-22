@@ -83,8 +83,73 @@ const sendToDlq = async (job, reason) => { // move to dlq
     );
 };
 
+const scheduleRetry = async (job, attempt, errorMsg) => { // retry bad job
+   const backoffMs = config.retryBaseMs * Math.pow(2, attempt - 1);
 
+   await client.hSet(
+      keys.job(job.jobId),
+      JobStatus("retrying", {
+         retryAttempt: String(attempt),
+         lastError: errorMsg,
+      }),
+   );
 
+   console.log(
+      `pipeline=${config.pipeline} mode=${config.mode} job=${job.jobId} status=retrying ` +
+         `attempt=${attempt} backoffMs=${backoffMs} error="${errorMsg}"`,
+   );
+
+   await sleep(backoffMs);
+   await client.lPush(config.queueName, JSON.stringify(RetryJob(job, attempt)));
+};
+
+const processJob = async (job) => {
+    const attempt = job.retryAttempt ?? 0
+    await client.hSet(
+        keys.job(job.jobId),
+        JobStatus("processing", {
+            pipeline: config.pipeline,
+            mode: config.mode
+        }),
+    );
+
+    await client.hIncrBy(keys.job(job.jobId), "processAttempts", 1);
+    await client.expire(keys.job(job.jobId), config.ttlSec);
+
+    // add idem later...
+
+    try {
+        const { delayMs, effectCount } = await applySideEffect(job.jobId)
+        const doneAt = new Date().toISOString()
+
+        await client.hSet(
+            keys.job(job.jobId),
+            JobStatus("done", {
+                updatedAt: doneAt,
+                finishedAt: doneAt,
+                effectCount: String(effectCount),
+                // idempotency: config.mode === "idem" ? "applied" : "none",
+            }),
+        );
+
+        console.log( // log message
+            `pipeline=${config.pipeline} mode=${config.mode} job=${job.jobId} ` +
+            `status=done effectCount=${effectCount} delayMs=${delayMs}`,
+        )
+
+    } catch (err) {
+        const nextAttempt = attempt + 1;
+
+        if (nextAttempt > config.maxRetries) {
+            await sendToDlq(job, err.message);
+        } else {
+            await scheduleRetry(job, nextAttempt, err.message);
+        }
+    }
+
+}
+
+// need to add actual worker loop
 
 
 const startTime = Date.now()
@@ -95,12 +160,6 @@ export function recordJobProcessed() {
     lastJobAt = new Date().toISOString()
     jobsProcessed += 1
 }
-
-
-
-
-
-
 
 app.get('/health', async (req, res) => {
     const checks = {}
