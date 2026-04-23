@@ -19,8 +19,8 @@ const config = {
 }
 
 // set up redis
-const redis = createClient({ url: config.redisUrl })
-await redis.connect()
+const client = createClient({ url: config.redisUrl })
+await client.connect() 
 
 const keys = {
     job: (jobId) => `job:${config.pipeline}:${jobId}`,
@@ -50,7 +50,7 @@ const RetryJob = (job, attempt) => ({
 })
 
 // util functs
-const sleep = (ms) => new Promise((res) => setTimeout(resolve, ms))
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 const randomDelayMs = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
 
 // worker functs
@@ -84,23 +84,32 @@ const sendToDlq = async (job, reason) => { // move to dlq
 };
 
 const scheduleRetry = async (job, attempt, errorMsg) => { // retry bad job
-   const backoffMs = config.retryBaseMs * Math.pow(2, attempt - 1);
+    const backoffMs = config.retryBaseMs * Math.pow(2, attempt - 1);
 
-   await client.hSet(
-      keys.job(job.jobId),
-      JobStatus("retrying", {
-         retryAttempt: String(attempt),
-         lastError: errorMsg,
-      }),
-   );
+    await client.hSet(
+        keys.job(job.jobId),
+        JobStatus("retrying", {
+            retryAttempt: String(attempt),
+            lastError: errorMsg,
+            scheduledAt: new Date(Date.now() + backoffMs).toISOString()
+        }),
+    );
 
-   console.log(
-      `pipeline=${config.pipeline} mode=${config.mode} job=${job.jobId} status=retrying ` +
-         `attempt=${attempt} backoffMs=${backoffMs} error="${errorMsg}"`,
-   );
+    console.log(
+        `pipeline=${config.pipeline} mode=${config.mode} job=${job.jobId} status=retrying ` +
+            `attempt=${attempt} backoffMs=${backoffMs} error="${errorMsg}"`,
+    );
 
-   await sleep(backoffMs);
-   await client.lPush(config.queueName, JSON.stringify(RetryJob(job, attempt)));
+//    await client.lPush(config.queueName, JSON.stringify(RetryJob(job, attempt)));
+
+    setTimeout(async () => {
+        try {
+            await client.lPush(config.queueName, JSON.stringify(RetryJob(job, attempt)));
+            console.log(`pipeline=${config.pipeline} job=${job.jobId} requeued attempt=${attempt}`);
+        } catch (err) {
+            console.error(`pipeline=${config.pipeline} job=${job.jobId} failed-requeue error=${err.message}`);
+        }
+    }, backoffMs)
 };
 
 const processJob = async (job) => {
@@ -132,6 +141,8 @@ const processJob = async (job) => {
             }),
         );
 
+        recordJobProcessed()
+
         console.log( // log message
             `pipeline=${config.pipeline} mode=${config.mode} job=${job.jobId} ` +
             `status=done effectCount=${effectCount} delayMs=${delayMs}`,
@@ -150,6 +161,35 @@ const processJob = async (job) => {
 }
 
 // need to add actual worker loop
+const loop = async () => {
+    while (true) {
+        const result = await client.brPop(config.queueName, 0)
+        const raw = result?.element
+        if (!raw) continue
+
+        let job
+        try {
+            job = JSON.parse(raw)
+        } catch (err) {
+            console.error("invalid job payload:", err.message)
+            continue
+        }
+
+        try {
+            await processJob(job)
+        } catch (err) {
+            await client.hSet(
+                keys.job(job.jobId),
+                JobStatus("failed", { error: err.message })
+            )
+            console.error(
+                `pipeline=${config.pipeline} mode=${config.mode} job=${job.jobId} ` +
+               `status=failed error=${err.message}`,
+            )
+        }
+
+    }
+}
 
 
 const startTime = Date.now()
@@ -168,14 +208,14 @@ app.get('/health', async (req, res) => {
     // check redis
     const redisStart = Date.now();
     try {
-        await redis.ping()
-        checks.redis = {
+        await client.ping()
+        checks.client = {
             status: 'healthy',
             latency_ms: Date.now() - redisStart
         }
         // healthy still true
     } catch (err) {
-        checks.redis = {
+        checks.client = {
             status: 'unhealthy',
             error: err.message
         }
@@ -187,8 +227,8 @@ app.get('/health', async (req, res) => {
 
     try {
 
-        const depth = await redis.lLen(process.env.QUEUE_NAME)
-        const dlqDepth = await redis.lLen(process.env.DLQ_NAME ?? `${process.env.QUEUE_NAME}:dlq`)
+        const depth = await client.lLen(config.queueName)
+        const dlqDepth = await client.lLen(config.dlqName ?? `${config.queueName}:dlq`)
 
         checks.queue = {
             status: depth < 1000 ? 'healthy' : 'degraded',
@@ -234,4 +274,5 @@ app.get('/health', async (req, res) => {
 })
 
 app.listen(process.env.PORT ?? 8081)
+await loop();
 
