@@ -53,6 +53,16 @@ const RetryJob = (job, attempt) => ({
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 const randomDelayMs = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
 
+function burnCpu(ms) {
+  const deadline = Date.now() + ms;
+  let x = Math.random();
+  while (Date.now() < deadline) {
+    x = Math.sqrt(x * x + 1.3) / 1.00001;
+  }
+  return x; // return so the result can't be eliminated as dead code
+}
+
+
 // worker functs
 
 const applySideEffect = async (jobId) => { // throw on poison pill 
@@ -60,7 +70,7 @@ const applySideEffect = async (jobId) => { // throw on poison pill
         throw new Error(`poison-pill job rejected: ${jobId}`)
 
     const delayMs = randomDelayMs(config.minMs, config.maxMs);
-    await sleep(delayMs);
+    burnCpu(delayMs);
     const effectCount = await client.incr(keys.effect(jobId));
     await client.expire(keys.effect(jobId), config.ttlSec);
     await client.incr(keys.totalEffects());
