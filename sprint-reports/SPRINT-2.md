@@ -20,7 +20,7 @@
 | ----------- | ------------------- | ----------- |
 | Gianna      | notification worker, health endpoint, queue checks, documentation | 38ce8c2, 00311d3, 6694a85, 13f687f, bb39331 |
 | Jada      | preparation tracker worker, health endpoint, queue checks | 35295b9, 0b54e36, 845728b |
-| Phoebe      | N/A | N/A |
+| Phoebe      | delivery-tracker-worker service, health endpoint, Dockerfile fix | b6e883e, 3ef52b9, a729ebc |
 | Nivaan      | rating service, rating database, surge pricing worker, pricing database, health endpoints | 5f39d35, d727837 |
 | Ashley      | redis consumer health endpoint, queue checks, pr #20, #22, #23 | 385902a, 2247eeb |
 | Aryan      | postgres database, idempotent POST orders endpoint, env variable fix | 48201b4, 86e3ce4, f4b64a5 |
