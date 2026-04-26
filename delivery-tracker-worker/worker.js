@@ -16,6 +16,7 @@ let lastJobAt = null
 let jobsProcessed = 0
 
 const app = express()
+app.use(express.json())
 
 app.get('/health', async (req, res) => {
   const checks = {}
@@ -53,6 +54,19 @@ app.get('/health', async (req, res) => {
     last_job_at: lastJobAt,
     jobs_processed: jobsProcessed,
     checks,
+  })
+})
+
+app.post('/inject-poison-pill', async (req, res) => {
+  const payload = `{poison-pill: true, "injectedAt": "${new Date().toISOString()}", broken`
+  await redis.rPush(QUEUE, payload)
+  log(`poison pill injected into queue="${QUEUE}"`)
+  res.json({
+    injected: true,
+    queue: QUEUE,
+    dlq: DLQ,
+    payload,
+    timestamp: new Date().toISOString(),
   })
 })
 
