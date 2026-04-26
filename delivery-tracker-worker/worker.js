@@ -62,7 +62,13 @@ async function handleJob(raw) {
     job = JSON.parse(raw)
   } catch (err) {
     log(`parse error — sending to DLQ: ${err.message}`)
-    await redis.rPush(DLQ, raw)
+    await redis.rPush(DLQ, JSON.stringify({ raw, reason: 'parse_error', error: err.message, dlqAt: new Date().toISOString() }))
+    return
+  }
+
+  if (!job.id) {
+    log(`validation error — missing required field 'id', sending to DLQ`)
+    await redis.rPush(DLQ, JSON.stringify({ raw: job, reason: 'validation_error', error: "missing required field 'id'", dlqAt: new Date().toISOString() }))
     return
   }
 
