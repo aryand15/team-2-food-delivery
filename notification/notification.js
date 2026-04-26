@@ -13,7 +13,7 @@ const config = {
     minMs: Number(process.env.WORK_SIM_MIN_MS),
     maxMs: Number(process.env.WORK_SIM_MAX_MS),
     ttlSec: Number(process.env.IDEM_TTL_SEC),
-    maxRetries: Number(process.env.MAX_RETRIES),
+    maxRetries: Number(process.env.MAX_RETRIES ),
     dlqName: process.env.DLQ_NAME,
     retryBaseMs: Number(process.env.RETRY_BASE_MS)
 }
@@ -21,6 +21,9 @@ const config = {
 // set up redis
 const client = createClient({ url: config.redisUrl })
 await client.connect() 
+
+const workerClient = createClient({ url: config.redisUrl });
+await workerClient.connect()
 
 const keys = {
     job: (jobId) => `job:${config.pipeline}:${jobId}`,
@@ -70,7 +73,7 @@ const applySideEffect = async (jobId) => { // throw on poison pill
         throw new Error(`poison-pill job rejected: ${jobId}`)
 
     const delayMs = randomDelayMs(config.minMs, config.maxMs);
-    burnCpu(delayMs);
+    sleep(delayMs);
     const effectCount = await client.incr(keys.effect(jobId));
     await client.expire(keys.effect(jobId), config.ttlSec);
     await client.incr(keys.totalEffects());
@@ -173,7 +176,7 @@ const processJob = async (job) => {
 // need to add actual worker loop
 const loop = async () => {
     while (true) {
-        const result = await client.brPop(config.queueName, 0)
+        const result = await workerClient.brPop(config.queueName, 0)
         const raw = result?.element
         if (!raw) continue
 
