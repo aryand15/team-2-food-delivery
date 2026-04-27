@@ -20,6 +20,8 @@ await pool.query(`
     created_at TIMESTAMPTZ DEFAULT NOW()
   )
 `)
+await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS ratings_order_id_unique ON ratings(order_id)`)
+await pool.query(`CREATE INDEX IF NOT EXISTS ratings_restaurant_id_idx ON ratings(restaurant_id)`)
 
 const startTime = Date.now()
 const ORDER_SERVICE_URL = process.env.ORDER_SERVICE_URL || 'http://order-service:3001'
@@ -64,8 +66,14 @@ app.post('/ratings', async (req, res) => {
   if (!order_id || !restaurant_id || !customer_id || !rating) {
     return res.status(400).json({ error: 'order_id, restaurant_id, customer_id, and rating are required' })
   }
+  if (!Number.isInteger(restaurant_id)) {
+    return res.status(400).json({ error: 'restaurant_id must be an integer' })
+  }
   if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
     return res.status(400).json({ error: 'rating must be an integer between 1 and 5' })
+  }
+  if (review != null && (typeof review !== 'string' || review.length > 2000)) {
+    return res.status(400).json({ error: 'review must be a string ≤2000 chars' })
   }
 
   try {
@@ -80,9 +88,20 @@ app.post('/ratings', async (req, res) => {
   const { rows } = await pool.query(
     `INSERT INTO ratings (order_id, restaurant_id, customer_id, rating, review)
      VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (order_id) DO NOTHING
      RETURNING id, order_id, restaurant_id, customer_id, rating, review, created_at`,
     [order_id, restaurant_id, customer_id, rating, review ?? null]
   )
+
+  if (rows.length === 0) {
+    const existing = await pool.query(
+      `SELECT id, order_id, restaurant_id, customer_id, rating, review, created_at
+         FROM ratings WHERE order_id = $1`,
+      [order_id]
+    )
+    return res.status(200).json({ message: 'rating already submitted', rating: existing.rows[0] })
+  }
+
   const saved = rows[0]
 
   await redis.publish('rating:submitted', JSON.stringify({
@@ -93,6 +112,41 @@ app.post('/ratings', async (req, res) => {
   }))
 
   res.status(201).json(saved)
+})
+
+app.get('/ratings/:id', async (req, res) => {
+  const id = Number(req.params.id)
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: 'id must be a positive integer' })
+  }
+  const { rows } = await pool.query(
+    `SELECT id, order_id, restaurant_id, customer_id, rating, review, created_at
+       FROM ratings WHERE id = $1`,
+    [id]
+  )
+  if (rows.length === 0) return res.status(404).json({ error: 'rating not found' })
+  res.json(rows[0])
+})
+
+app.get('/restaurants/:restaurant_id/ratings', async (req, res) => {
+  const restaurantId = Number(req.params.restaurant_id)
+  if (!Number.isInteger(restaurantId) || restaurantId <= 0) {
+    return res.status(400).json({ error: 'restaurant_id must be a positive integer' })
+  }
+  const limit = Math.min(Number(req.query.limit) || 50, 200)
+  const offset = Math.max(Number(req.query.offset) || 0, 0)
+  const { rows } = await pool.query(
+    `SELECT id, order_id, customer_id, rating, review, created_at
+       FROM ratings WHERE restaurant_id = $1
+       ORDER BY created_at DESC
+       LIMIT $2 OFFSET $3`,
+    [restaurantId, limit, offset]
+  )
+  const total = await pool.query(
+    `SELECT COUNT(*)::int AS c FROM ratings WHERE restaurant_id = $1`,
+    [restaurantId]
+  )
+  res.json({ restaurant_id: restaurantId, total: total.rows[0].c, limit, offset, ratings: rows })
 })
 
 // Aggregate average rating per restaurant.
