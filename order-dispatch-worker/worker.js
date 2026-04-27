@@ -5,30 +5,29 @@ const app = express()
 app.use(express.json())
 
 const config = {
-    redisUrl:             process.env.REDIS_URL              || 'redis://redis:6379',
-    queueName:            process.env.QUEUE_NAME             || 'orders:queue',
-    pipeline:             process.env.PIPELINE               || 'order-dispatch',
-    mode:                 process.env.MODE                   || 'no-idem',
-    ttlSec:               Number(process.env.IDEM_TTL_SEC    || 86400),
-    maxRetries:           Number(process.env.MAX_RETRIES     || 3),
-    retryBaseMs:          Number(process.env.RETRY_BASE_MS   || 500),
-    driverServiceUrl:     process.env.DRIVER_SERVICE_URL     || 'http://driver-service:3002',
+    redisUrl: process.env.REDIS_URL || 'redis://redis:6379',
+    queueName: process.env.QUEUE_NAME || 'orders:queue',
+    pipeline: process.env.PIPELINE || 'order-dispatch',
+    mode: process.env.MODE || 'no-idem',
+    ttlSec: Number(process.env.IDEM_TTL_SEC || 86400),
+    maxRetries: Number(process.env.MAX_RETRIES || 3),
+    retryBaseMs: Number(process.env.RETRY_BASE_MS   || 500),
+    driverServiceUrl: process.env.DRIVER_SERVICE_URL || 'http://driver-service:3002',
     restaurantServiceUrl: process.env.RESTAURANT_SERVICE_URL || 'http://restaurant-service:3003',
-    dispatchChannel:      process.env.DISPATCH_CHANNEL       || 'orders:dispatched',
+    dispatchChannel: process.env.DISPATCH_CHANNEL || 'orders:dispatched',
 }
 
-// DLQ is always <queue>:dlq per spec naming convention
 const DLQ_NAME = `${config.queueName}:dlq`
 
 // Redis clients
 
-const redis       = createClient({ url: config.redisUrl })
+const redis = createClient({ url: config.redisUrl })
 const healthRedis = createClient({ url: config.redisUrl })
-const pubRedis    = createClient({ url: config.redisUrl })
+const pubRedis = createClient({ url: config.redisUrl })
 
-redis.on('error',       (err) => console.error('Redis error:',       err.message))
+redis.on('error', (err) => console.error('Redis error:', err.message))
 healthRedis.on('error', (err) => console.error('HealthRedis error:', err.message))
-pubRedis.on('error',    (err) => console.error('PubRedis error:',    err.message))
+pubRedis.on('error', (err) => console.error('PubRedis error:', err.message))
 
 await redis.connect()
 await healthRedis.connect()
@@ -37,8 +36,8 @@ await pubRedis.connect()
 // Redis key helpers
 
 const keys = {
-    job:      (jobId) => `job:${config.pipeline}:${jobId}`,
-    dlqTotal: ()      => `dlq-total:${config.pipeline}`,
+    job: (jobId) => `job:${config.pipeline}:${jobId}`,
+    dlqTotal: () => `dlq-total:${config.pipeline}`,
 }
 
 const JobStatus = (status, fields = {}) => ({
@@ -71,10 +70,10 @@ class PoisonPillError extends Error {
 }
 
 function validateJob(job) {
-    if (!job.id)            return { valid: false, error: 'missing field: id' }
+    if (!job.id) return { valid: false, error: 'missing field: id' }
     if (!job.restaurant_id) return { valid: false, error: 'missing field: restaurant_id' }
     if (!Array.isArray(job.items) || job.items.length === 0)
-                            return { valid: false, error: 'missing or empty field: items' }
+        return { valid: false, error: 'missing or empty field: items' }
     return { valid: true }
 }
 
@@ -85,7 +84,7 @@ async function verifyRestaurant(restaurantId) {
     } catch (err) {
         throw new Error(`restaurant service unreachable: ${err.message}`)
     }
-    if (res.status === 404) {
+    if (res.status === 404 || res.status === 400) {
         throw new PoisonPillError(`restaurant ${restaurantId} not found`)
     }
     if (!res.ok) {
@@ -95,9 +94,9 @@ async function verifyRestaurant(restaurantId) {
 
 async function assignDriver(orderId, restaurantId) {
     const res = await fetch(`${config.driverServiceUrl}/drivers/assign`, {
-        method:  'POST',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ order_id: orderId, restaurant_id: restaurantId }),
+        body: JSON.stringify({ order_id: orderId, restaurant_id: restaurantId }),
     })
     if (!res.ok) {
         const text = await res.text()
@@ -178,10 +177,10 @@ async function processJob(job, raw) {
 
     try {
         await pubRedis.publish(config.dispatchChannel, JSON.stringify({
-            event:        'order_dispatched',
-            orderId:      job.id,
+            event: 'order_dispatched',
+            orderId: job.id,
             restaurantId: job.restaurant_id,
-            driverId:     driverAssignment?.driver_id ?? null,
+            driverId: driverAssignment?.driver_id ?? null,
             dispatchedAt: new Date().toISOString(),
         }))
     } catch (err) {
@@ -191,7 +190,7 @@ async function processJob(job, raw) {
     const doneAt = new Date().toISOString()
     await redis.hSet(keys.job(job.id), JobStatus('done', {
         finishedAt: doneAt,
-        driverId:   String(driverAssignment?.driver_id ?? 'unknown'),
+        driverId: String(driverAssignment?.driver_id ?? 'unknown'),
     }))
     await redis.expire(keys.job(job.id), config.ttlSec)
 
@@ -199,12 +198,12 @@ async function processJob(job, raw) {
     jobsProcessed += 1
 
     console.log(JSON.stringify({
-        event:          'job_processed',
-        jobId:          job.id,
-        restaurantId:   job.restaurant_id,
-        driverId:       driverAssignment?.driver_id ?? null,
+        event: 'job_processed',
+        jobId: job.id,
+        restaurantId: job.restaurant_id,
+        driverId: driverAssignment?.driver_id ?? null,
         jobs_processed: jobsProcessed,
-        timestamp:      lastJobAt,
+        timestamp: lastJobAt,
     }))
 }
 
@@ -224,10 +223,10 @@ app.get('/health', async (req, res) => {
     }
 
     try {
-        const depth    = await healthRedis.lLen(config.queueName)
+        const depth = await healthRedis.lLen(config.queueName)
         const dlqDepth = await healthRedis.lLen(DLQ_NAME)
         checks.queue = {
-            status:    dlqDepth > 0 ? 'degraded' : 'healthy',
+            status: dlqDepth > 0 ? 'degraded' : 'healthy',
             depth,
             dlq_depth: dlqDepth,
         }
@@ -240,18 +239,17 @@ app.get('/health', async (req, res) => {
         ? (Date.now() - new Date(lastJobAt).getTime()) / 1000
         : null
     checks.worker = {
-        status:                 secondsSinceLastJob === null || secondsSinceLastJob < 60
-                                    ? 'healthy' : 'degraded',
-        last_job_at:            lastJobAt ?? 'never',
-        jobs_processed:         jobsProcessed,
-        jobs_failed:            jobsFailed,
+        status: secondsSinceLastJob === null || secondsSinceLastJob < 60 ? 'healthy' : 'degraded',
+        last_job_at: lastJobAt ?? 'never',
+        jobs_processed: jobsProcessed,
+        jobs_failed: jobsFailed,
         seconds_since_last_job: secondsSinceLastJob,
     }
 
     res.status(healthy ? 200 : 503).json({
-        status:         healthy ? 'healthy' : 'unhealthy',
-        service:        process.env.SERVICE_NAME ?? 'order-dispatch-worker',
-        timestamp:      new Date().toISOString(),
+        status: healthy ? 'healthy' : 'unhealthy',
+        service: process.env.SERVICE_NAME ?? 'order-dispatch-worker',
+        timestamp: new Date().toISOString(),
         uptime_seconds: Math.floor((Date.now() - startTime) / 1000),
         checks,
     })
@@ -269,9 +267,9 @@ app.post('/poison-pill', async (req, res) => {
     try {
         await redis.lPush(config.queueName, raw)
         res.status(202).json({
-            message:  'Poison pill injected into queue',
-            queue:    config.queueName,
-            dlq:      DLQ_NAME,
+            message: 'Poison pill injected into queue',
+            queue: config.queueName,
+            dlq: DLQ_NAME,
             injected: raw,
         })
     } catch (err) {
@@ -282,11 +280,11 @@ app.post('/poison-pill', async (req, res) => {
 app.listen(process.env.PORT ?? 8080)
 
 console.log(JSON.stringify({
-    event:      'worker_started',
-    queue:      config.queueName,
-    dlq:        DLQ_NAME,
+    event: 'worker_started',
+    queue: config.queueName,
+    dlq: DLQ_NAME,
     maxRetries: config.maxRetries,
-    pipeline:   config.pipeline,
+    pipeline: config.pipeline,
 }))
 
 while (true) {
@@ -309,11 +307,11 @@ while (true) {
         }
 
         console.log(JSON.stringify({
-            event:        'order_received',
-            jobId:        job.id ?? 'unknown',
+            event: 'order_received',
+            jobId: job.id ?? 'unknown',
             restaurantId: job.restaurant_id ?? 'unknown',
             retryAttempt: job.retryAttempt ?? 0,
-            timestamp:    new Date().toISOString(),
+            timestamp: new Date().toISOString(),
         }))
 
         try {
