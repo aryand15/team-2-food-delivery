@@ -40,10 +40,12 @@ All 5 workers will have a working health endpoint which includes the current que
 
 ### Phoebe
 
+- Bare minimum structure for delivery tracker service
 - Implement a working health endpoint for delivery tracker worker
 
 ### Nivaan
 
+- Bare minimum structure for rating and review service
 - Implement a working health endpoint for surge tracker worker
 
 ### Ashley
