@@ -39,6 +39,7 @@ await pool.query(`
 
 const startTime = Date.now()
 let lastProcessedAt = null
+let jobsProcessed = 0
 
 const app = express()
 
@@ -76,8 +77,23 @@ app.get('/health', async (req, res) => {
     queue_depth,
     dlq_depth,
     last_processed_at: lastProcessedAt,
+    jobs_processed: jobsProcessed,
     checks,
   })
+})
+
+app.post('/events', express.json(), async (req, res) => {
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    return res.status(400).json({ error: 'JSON object body required' })
+  }
+  await redis.rPush(QUEUE, JSON.stringify(req.body))
+  res.status(202).json({ enqueued: true })
+})
+
+app.post('/inject-poison-pill', express.text({ type: '*/*' }), async (req, res) => {
+  const raw = typeof req.body === 'string' ? req.body : ''
+  await redis.rPush(QUEUE, raw)
+  res.status(202).json({ enqueued: true, length: raw.length })
 })
 
 async function sendToDlq(raw, reason) {
@@ -114,6 +130,7 @@ async function handleEvent(raw) {
       await client.query('COMMIT')
       log(`duplicate event_id=${event_id} — skipping (idempotent)`)
       lastProcessedAt = new Date().toISOString()
+      jobsProcessed += 1
       return
     }
 
@@ -148,6 +165,7 @@ async function handleEvent(raw) {
     }
 
     lastProcessedAt = new Date().toISOString()
+    jobsProcessed += 1
   } catch (err) {
     await client.query('ROLLBACK')
     log(`processing failed event_id=${event_id}: ${err.message}`)
