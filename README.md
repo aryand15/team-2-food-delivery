@@ -9,16 +9,16 @@
 
 ## Team and Service Ownership
 
-| Team Member | Services / Components Owned              |
-| ----------- | ---------------------------------------- |
-| Nivan       | `driver-service/`, `driver-db/`          |
-| Aryan       | `order-service/`, `order-db/`            |
-| Ayaan       | `restaurant-service/`                    |
-| Eva         | `compose.yml`, `redis`                   |
-| Jada        | `restaurant-service/`, `restaurant-db/`  |
-| Ashley      | `order-service/`                         |
-| Gianna      | `driver-service/`                        |
-| Phoebe      | `delivery-tracker-worker/`               |
+| Team Member | Services / Components Owned                             |
+| ----------- | ------------------------------------------------------- |
+| Nivaan      | `driver-service/`, `driver-db/`, `surge-pricing-worker/`|
+| Aryan       | `order-service/`, `order-db/`                           |
+| Ayaan       | `restaurant-service/`, `restaurant-db`                  |
+| Eva         | `compose.yml`, `redis`, `k6/`                           |
+| Jada        | `preparation-tracker-worker/`                           |
+| Ashley      | `order-dispatch-worker/`                                |
+| Gianna      | `notification-worker/`                                  |
+| Phoebe      | `delivery-tracker-worker/`                              |
 
 > Ownership is verified by `git log --author`. Each person must have meaningful commits in the directories they claim.
 
