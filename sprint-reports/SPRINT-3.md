@@ -16,7 +16,7 @@
 
 | Team Member | What They Delivered | Key Commits |
 | ----------- | ------------------- | ----------- |
-| [Name]      | | |
+| Phoebe      | DLQ handling for delivery tracker worker (parse errors + missing `id` → `deliveries:queue:dlq`), `POST /inject-poison-pill` endpoint | 000e2f2, 3ea9d5c |
 | [Name]      | | |
 | [Name]      | | |
 
