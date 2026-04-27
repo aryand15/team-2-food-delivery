@@ -93,10 +93,13 @@ async function verifyRestaurant(restaurantId) {
 }
 
 async function assignDriver(orderId, restaurantId) {
-    const res = await fetch(`${config.driverServiceUrl}/drivers/assign`, {
+    const res = await fetch(`${config.driverServiceUrl}/assignments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order_id: orderId, restaurant_id: restaurantId }),
+        body: JSON.stringify({ 
+            order_id: orderId, 
+            source_event_id: orderId  // use orderId as the idempotency key
+        }),
     })
     if (!res.ok) {
         const text = await res.text()
