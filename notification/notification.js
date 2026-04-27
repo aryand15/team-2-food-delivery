@@ -286,6 +286,19 @@ app.get('/health', async (req, res) => {
 
 })
 
+app.post('/inject-poison-pill', async (req, res) => {
+  const payload = `{poison-pill: true, "injectedAt": "${new Date().toISOString()}", broken`
+  await redis.rPush(config.queueName, payload)
+  log(`poison pill injected into queue="${config.queueName}"`)
+  res.json({
+    injected: true,
+    queue: config.queueName,
+    dlq: DLQ,
+    payload,
+    timestamp: new Date().toISOString(),
+  })
+})
+
 app.listen(process.env.PORT ?? 8081)
 await loop();
 
