@@ -53,6 +53,8 @@ function recordJobProcessed() {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
+// validate prep job before trying to process it
+// if missing/invalid field, treat as poison pill
 function validateJob(job) {
   if (!job || typeof job !== 'object') {
     throw new Error('payload must be an object')
@@ -74,6 +76,7 @@ function validateJob(job) {
   }
 }
 
+// push bad message into dlq and log reason it failed
 async function sendToDlq(rawMessage, reason) {
   await client.lPush(config.dlqName, rawMessage)
 
@@ -162,6 +165,7 @@ const loop = async () => {
   }
 }
 
+// health endpoint 
 app.get('/health', async (req, res) => {
   const checks = {}
   let healthy = true
@@ -183,11 +187,12 @@ app.get('/health', async (req, res) => {
 
   try {
     const depth = await client.lLen(config.queueName)
+    const dlqDepth = await client.lLen(config.dlqName)
 
     checks.queue = {
-      status: 'healthy',
+      status: dlqDepth > 0 ? 'degraded' : 'healthy',
       depth,
-      dlq_depth: 0,
+      dlq_depth: dlqDepth,
     }
   } catch (err) {
     checks.queue = {
@@ -217,6 +222,19 @@ app.get('/health', async (req, res) => {
     timestamp: new Date().toISOString(),
     uptime_seconds: Math.floor((Date.now() - startTime) / 1000),
     checks,
+  })
+})
+
+app.post('/inject-poison-pill', async (req, res) => {
+  const payload = `{poison-pill: true, "injectedAt": "${new Date().toISOString()}", broken`
+  await client.rPush(config.queueName, payload)
+
+  res.json({
+    injected: true,
+    queue: config.queueName,
+    dlq: config.dlqName,
+    payload,
+    timestamp: new Date().toISOString(),
   })
 })
 
