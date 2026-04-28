@@ -118,7 +118,7 @@ services:
       DATABASE_URL: postgres://user:pass@restaurant-db:5432/restaurantdb
       REDIS_URL: redis://redis:6379
     depends_on:
-      driver-db:
+      restaurant-db:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -332,6 +332,7 @@ services:
       POSTGRES_DB: restaurantdb
     volumes:
       - restaurant-db:/var/lib/postgresql/data
+      - ./restaurant/init:/docker-entrypoint-initdb.d
     networks:
       - team-net
     healthcheck:

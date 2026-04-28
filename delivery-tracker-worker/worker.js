@@ -16,6 +16,7 @@ let lastJobAt = null
 let jobsProcessed = 0
 
 const app = express()
+app.use(express.json())
 
 app.get('/health', async (req, res) => {
   const checks = {}
@@ -56,13 +57,32 @@ app.get('/health', async (req, res) => {
   })
 })
 
+app.post('/inject-poison-pill', async (req, res) => {
+  const payload = `{poison-pill: true, "injectedAt": "${new Date().toISOString()}", broken`
+  await redis.rPush(QUEUE, payload)
+  log(`poison pill injected into queue="${QUEUE}"`)
+  res.json({
+    injected: true,
+    queue: QUEUE,
+    dlq: DLQ,
+    payload,
+    timestamp: new Date().toISOString(),
+  })
+})
+
 async function handleJob(raw) {
   let job
   try {
     job = JSON.parse(raw)
   } catch (err) {
     log(`parse error — sending to DLQ: ${err.message}`)
-    await redis.rPush(DLQ, raw)
+    await redis.rPush(DLQ, JSON.stringify({ raw, reason: 'parse_error', error: err.message, dlqAt: new Date().toISOString() }))
+    return
+  }
+
+  if (!job.id) {
+    log(`validation error — missing required field 'id', sending to DLQ`)
+    await redis.rPush(DLQ, JSON.stringify({ raw: job, reason: 'validation_error', error: "missing required field 'id'", dlqAt: new Date().toISOString() }))
     return
   }
 

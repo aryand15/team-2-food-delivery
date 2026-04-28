@@ -63,6 +63,28 @@ const getOrderByIdempotencyKey = async (idempotencyKey) => {
   return result.rows[0] ?? null;
 };
 
+const getOrderById = async (orderId) => {
+  const result = await pool.query(
+    `
+      SELECT
+        id,
+        idempotency_key,
+        restaurant_id,
+        customer_id,
+        status,
+        dispatch_attempt_count,
+        created_at,
+        updated_at
+      FROM orders
+      WHERE id::text = $1
+      LIMIT 1
+    `,
+    [orderId]
+  );
+
+  return result.rows[0] ?? null;
+};
+
 app.post("/orders", async (req, res) => {
   const payload = req.body ?? {};
   const validation = validateOrderPayload(payload);
@@ -110,6 +132,43 @@ app.post("/orders", async (req, res) => {
         order
       });
     }
+  } catch (err) {
+    return res.status(500).json({
+      message: "Internal server error",
+      error: err.message
+    });
+  }
+});
+
+
+app.get("/orders/:id", async (req, res) => {
+  const orderId = req.params.id?.trim();
+
+  if (!orderId) {
+    return res.status(400).json({
+      message: "Order id is required"
+    });
+  }
+
+  try {
+    const order = await getOrderById(orderId);
+
+    if (!order) {
+      return res.status(404).json({
+        message: "Order not found"
+      });
+    }
+
+    return res.status(200).json({
+      orderId: order.id,
+      clientOrderId: order.idempotency_key,
+      restaurantId: order.restaurant_id,
+      customerId: order.customer_id,
+      status: order.status,
+      dispatchAttemptCount: order.dispatch_attempt_count,
+      createdAt: order.created_at,
+      updatedAt: order.updated_at
+    });
   } catch (err) {
     return res.status(500).json({
       message: "Internal server error",

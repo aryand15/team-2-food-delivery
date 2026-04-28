@@ -1,0 +1,47 @@
+CREATE TABLE IF NOT EXISTS restaurants (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  cuisine TEXT NOT NULL,
+  is_open BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS menu_items (
+  id INTEGER PRIMARY KEY,
+  restaurant_id INTEGER NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  price NUMERIC(10,2) NOT NULL CHECK (price >= 0),
+  available BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_menu_items_restaurant_id
+  ON menu_items(restaurant_id);
+
+CREATE TABLE IF NOT EXISTS idempotency_keys (
+  operation TEXT NOT NULL,
+  idempotency_key TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'processing',
+  response_status INTEGER,
+  response_body JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (operation, idempotency_key)
+);
+
+INSERT INTO restaurants (id, name, cuisine, is_open)
+VALUES
+  (1, 'Sample Restaurant', 'Test Cuisine', true),
+  (2, 'Pizza Palace', 'Italian', true)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO menu_items (id, restaurant_id, name, description, price, available)
+VALUES
+  (101, 1, 'Classic Burger', 'Beef burger with lettuce, tomato, and fries', 12.99, true),
+  (102, 1, 'Crispy Chicken Wrap', 'Chicken wrap with ranch sauce', 9.49, true),
+  (103, 1, 'Soft Drink', 'Choice of cola, lemon-lime, or orange', 2.50, true),
+  (201, 2, 'Margherita Pizza', 'Tomato, mozzarella, and basil', 13.50, true),
+  (202, 2, 'Pasta Alfredo', 'Creamy alfredo pasta with parmesan', 11.75, false)
+ON CONFLICT (id) DO NOTHING;
