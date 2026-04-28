@@ -17,6 +17,9 @@ const config = {
 const client = createClient({ url: config.redisUrl })
 await client.connect()
 
+const workerClient = createClient({ url: config.redisUrl })
+await workerClient.connect()
+
 const publisher = createClient({ url: config.redisUrl })
 await publisher.connect()
 
@@ -146,7 +149,7 @@ async function processJob(rawMessage) {
 const loop = async () => {
   while (true) {
     try {
-      const result = await client.brPop(config.queueName, 0)
+      const result = await workerClient.brPop(config.queueName, 0)
       const raw = result?.element
       if (!raw) continue
 
@@ -252,4 +255,6 @@ app.listen(config.port, () => {
   )
 })
 
-await loop()
+loop().catch((err) => {
+  console.error("prep worker loop crashed:", err)
+})
