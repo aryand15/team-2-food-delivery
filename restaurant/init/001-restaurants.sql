@@ -21,6 +21,16 @@ CREATE TABLE IF NOT EXISTS menu_items (
 CREATE INDEX IF NOT EXISTS idx_menu_items_restaurant_id
   ON menu_items(restaurant_id);
 
+CREATE TABLE IF NOT EXISTS idempotency_keys (
+  operation TEXT NOT NULL,
+  idempotency_key TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'processing',
+  response_status INTEGER,
+  response_body JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (operation, idempotency_key)
+);
+
 INSERT INTO restaurants (id, name, cuisine, is_open)
 VALUES
   (1, 'Sample Restaurant', 'Test Cuisine', true),
