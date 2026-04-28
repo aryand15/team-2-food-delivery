@@ -21,8 +21,8 @@ The system now handles poison-pill failures where workers receive malformed or i
 | Gianna    | notification worker poison pill & dlq handling | 3fe1257, 67cbd69|
 | Aryan    | implement db & functionality to order service | 00c9d60 |
 | Ashley    | order dispatch worker poison pill & dlq handling | 23177f3, 5073615, |
-| Nivaan    | surge pricing poison pill, implement db & functionality | d39f562, a8b7359 |
-| Ayaan    | N/A | N/A |
+| Nivaan    | surge pricing poison pill, implement db & functionality | d39f562, a8b7359 
+| Ayaan    | database-backed restaurant service, restaurant/menu CRUD endpoints | 26e07d4, 7f217eb |
 
 
 
