@@ -53,49 +53,91 @@ function recordJobProcessed() {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
-async function processJob(rawMessage) {
-  const startedAt = Date.now()
-  const job = JSON.parse(rawMessage)
+function validateJob(job) {
+  if (!job || typeof job !== 'object') {
+    throw new Error('payload must be an object')
+  }
 
-  const prepTimeMs = Number(job.prepTimeMs ?? config.prepMs)
+  if (!job.orderId) {
+    throw new Error('missing required field: orderId')
+  }
 
-  console.log(
+  if (!job.restaurantId) {
+    throw new Error('missing required field: restaurantId')
+  }
+
+  if (
+    job.prepTimeMs !== undefined &&
+    (!Number.isFinite(Number(job.prepTimeMs)) || Number(job.prepTimeMs) < 0)
+  ) {
+    throw new Error('invalid prepTimeMs')
+  }
+}
+
+async function sendToDlq(rawMessage, reason) {
+  await client.lPush(config.dlqName, rawMessage)
+
+  console.error(
     JSON.stringify({
-      event: 'prep_job_received',
-      orderId: job.orderId,
-      restaurantId: job.restaurantId,
-      prepTimeMs,
+      event: 'poison_pill_routed',
+      queue: config.queueName,
+      dlq: config.dlqName,
+      error: reason,
+      rawMessage,
       timestamp: new Date().toISOString(),
     })
   )
+}
 
-  await sleep(prepTimeMs)
+async function processJob(rawMessage) {
+  const startedAt = Date.now()
 
-  const readyEvent = {
-    orderId: job.orderId,
-    restaurantId: job.restaurantId,
-    status: 'order_ready',
-    preparedAt: new Date().toISOString(),
-  }
+  try {
+    const job = JSON.parse(rawMessage)
+    validateJob(job)
 
-  await publisher.publish(config.orderReadyChannel, JSON.stringify(readyEvent))
+    const prepTimeMs = Number(job.prepTimeMs ?? config.prepMs)
 
-  recordJobProcessed()
+    console.log(
+      JSON.stringify({
+        event: 'prep_job_received',
+        orderId: job.orderId,
+        restaurantId: job.restaurantId,
+        prepTimeMs,
+        timestamp: new Date().toISOString(),
+      })
+    )
 
-  const remainingDepth = await client.lLen(config.queueName)
+    await sleep(prepTimeMs)
 
-  console.log(
-    JSON.stringify({
-      event: 'job_processed',
+    const readyEvent = {
       orderId: job.orderId,
       restaurantId: job.restaurantId,
-      queueDepth: remainingDepth,
-      processingTimeMs: Date.now() - startedAt,
-      jobsProcessed,
-      published_channel: config.orderReadyChannel,
-      timestamp: lastJobAt,
-    })
-  )
+      status: 'order_ready',
+      preparedAt: new Date().toISOString(),
+    }
+
+    await publisher.publish(config.orderReadyChannel, JSON.stringify(readyEvent))
+
+    recordJobProcessed()
+
+    const remainingDepth = await client.lLen(config.queueName)
+
+    console.log(
+      JSON.stringify({
+        event: 'job_processed',
+        orderId: job.orderId,
+        restaurantId: job.restaurantId,
+        queueDepth: remainingDepth,
+        processingTimeMs: Date.now() - startedAt,
+        jobsProcessed,
+        published_channel: config.orderReadyChannel,
+        timestamp: lastJobAt,
+      })
+    )
+  } catch (err) {
+    await sendToDlq(rawMessage, err.message)
+  }
 }
 
 const loop = async () => {
