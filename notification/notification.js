@@ -185,6 +185,7 @@ const loop = async () => {
             job = JSON.parse(raw)
         } catch (err) {
             console.error("invalid job payload:", err.message)
+            await client.lPush(config.dlqName ?? `${config.queueName}:dlq`, raw)
             continue
         }
 
@@ -287,18 +288,28 @@ app.get('/health', async (req, res) => {
 })
 
 app.post('/inject-poison-pill', async (req, res) => {
-  const payload = `{poison-pill: true, "injectedAt": "${new Date().toISOString()}", broken`
-  await redis.rPush(config.queueName, payload)
-  log(`poison pill injected into queue="${config.queueName}"`)
-  res.json({
-    injected: true,
-    queue: config.queueName,
-    dlq: DLQ,
-    payload,
-    timestamp: new Date().toISOString(),
-  })
+  try {
+    const payload = `{poison-pill: true, "injectedAt": "${new Date().toISOString()}", broken`
+
+    await client.lPush(config.queueName, payload)
+
+    res.status(202).json({
+      injected: true,
+      queue: config.queueName,
+      dlq: config.dlqName,
+      payload,
+      timestamp: new Date().toISOString()
+    })
+  } catch (err) {
+    res.status(500).json({
+      error: err.message
+    })
+  }
 })
 
 app.listen(process.env.PORT ?? 8081)
-await loop();
+
+loop().catch((err) => {
+  console.error("notification worker loop crashed:", err)
+})
 
