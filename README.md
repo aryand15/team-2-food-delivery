@@ -138,6 +138,104 @@ curl http://localhost:3001/get-drivers
 ]
 ```
 
+#### POST /orders
+
+```
+POST /orders
+
+  Creates a new order if the idempotency key has not been used before.
+  If the same clientOrderId is submitted again, the existing order is returned.
+
+  Request body:
+    clientOrderId  string   required
+    restaurantId   string   required
+    items          array    required
+
+  Each item object must contain:
+    menuItemId     integer  required
+    quantity       integer  required, must be > 0
+
+  Responses:
+    201  Order accepted and queued
+    200  Duplicate order, existing order returned
+    400  Invalid request body
+    500  Internal server error
+```
+
+**Example request:**
+
+```bash
+curl -X POST http://localhost:3001/orders \
+  -H "Content-Type: application/json" \
+  -d '{
+    "clientOrderId": "order-123",
+    "restaurantId": "1",
+    "items": [
+      { "menuItemId": 101, "quantity": 2 },
+      { "menuItemId": 103, "quantity": 1 }
+    ]
+  }'
+```
+
+**Example response (201):**
+
+```json
+{
+  "message": "Order accepted",
+  "order": {
+    "id": "0f2c6d92-2fa4-4a91-b87f-cf6d0d6a9d50",
+    "idempotency_key": "order-123",
+    "restaurant_id": "1",
+    "customer_id": null,
+    "items": [
+      { "menuItemId": 101, "quantity": 2 },
+      { "menuItemId": 103, "quantity": 1 }
+    ],
+    "status": "queued",
+    "dispatch_attempt_count": 0,
+    "created_at": "2026-04-28T00:00:00.000Z",
+    "updated_at": "2026-04-28T00:00:00.000Z"
+  }
+}
+```
+
+#### GET /orders/:id
+
+```
+GET /orders/:id
+
+  Returns the current status and metadata for a single order.
+
+  Path parameters:
+    id  string  required
+
+  Responses:
+    200  Order found
+    404  Order not found
+    500  Internal server error
+```
+
+**Example request:**
+
+```bash
+curl http://localhost:3001/orders/0f2c6d92-2fa4-4a91-b87f-cf6d0d6a9d50
+```
+
+**Example response (200):**
+
+```json
+{
+  "orderId": "0f2c6d92-2fa4-4a91-b87f-cf6d0d6a9d50",
+  "clientOrderId": "order-123",
+  "restaurantId": "1",
+  "customerId": null,
+  "status": "queued",
+  "dispatchAttemptCount": 0,
+  "createdAt": "2026-04-28T00:00:00.000Z",
+  "updatedAt": "2026-04-28T00:00:00.000Z"
+}
+```
+
 ---
 
 ### driver-service
