@@ -2,8 +2,9 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-COPY package.json package.json
 RUN apk add --no-cache curl
+
+COPY package*.json ./
 RUN npm install
 
 COPY worker.js worker.js
