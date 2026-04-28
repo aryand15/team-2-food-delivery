@@ -1,0 +1,23 @@
+:80 {
+  encode gzip
+
+  handle_path /order/* {
+    reverse_proxy order-service:3001
+  }
+
+  handle_path /driver/* {
+    reverse_proxy driver-service:3002
+  }
+
+  handle_path /restaurant/* {
+    reverse_proxy restaurant-service:3003
+  }
+
+  handle_path /rating/* {
+    reverse_proxy rating-service:3004
+  }
+
+  handle {
+    respond "team-2 gateway up" 200
+  }
+}
