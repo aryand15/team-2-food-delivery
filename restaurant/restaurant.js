@@ -1,7 +1,6 @@
 const express = require("express");
 const { Pool } = require("pg");
 const { createClient } = require("redis");
-const mockData = require("./mock-data.json");
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -27,9 +26,65 @@ app.get("/", (req, res) => {
   res.json({ message: "Restaurant Service is running" });
 });
 
-// Temporary restaurants endpoint (replace with DB-backed routes later)
-app.get("/restaurants", (req, res) => {
-  res.json(mockData.restaurants);
+async function getRestaurants() {
+  if (!pool) {
+    throw new Error("DATABASE_URL not set");
+  }
+
+  const result = await pool.query(`
+    SELECT id, name, cuisine, is_open, created_at, updated_at
+    FROM restaurants
+    ORDER BY id
+  `);
+
+  return result.rows;
+}
+
+async function getRestaurantMenu(restaurantId) {
+  if (!pool) {
+    throw new Error("DATABASE_URL not set");
+  }
+
+  const restaurantResult = await pool.query(
+    `
+      SELECT id
+      FROM restaurants
+      WHERE id = $1
+      LIMIT 1
+    `,
+    [restaurantId]
+  );
+
+  if (restaurantResult.rows.length === 0) {
+    return null;
+  }
+
+  const menuResult = await pool.query(
+    `
+      SELECT id, name, description, price, available, created_at, updated_at
+      FROM menu_items
+      WHERE restaurant_id = $1
+      ORDER BY id
+    `,
+    [restaurantId]
+  );
+
+  return {
+    restaurant_id: restaurantId,
+    items: menuResult.rows
+  };
+}
+
+app.get("/restaurants", async (req, res) => {
+  try {
+    const restaurants = await getRestaurants();
+    return res.json(restaurants);
+  } catch (error) {
+    return res.status(503).json({
+      error: "Restaurant database unavailable",
+      detail: error.message || String(error)
+    });
+  }
 });
 
 app.get("/restaurants/:id/menu", async (req, res) => {
@@ -52,16 +107,19 @@ app.get("/restaurants/:id/menu", async (req, res) => {
     }
   }
 
-  const menuItems = mockData.menus[String(restaurantId)];
-
-  if (!menuItems) {
-    return res.status(404).json({ error: "Menu not found for restaurant" });
+  let responseBody;
+  try {
+    responseBody = await getRestaurantMenu(restaurantId);
+  } catch (error) {
+    return res.status(503).json({
+      error: "Restaurant database unavailable",
+      detail: error.message || String(error)
+    });
   }
 
-  const responseBody = {
-    restaurant_id: restaurantId,
-    items: menuItems
-  };
+  if (!responseBody) {
+    return res.status(404).json({ error: "Menu not found for restaurant" });
+  }
 
   if (redis) {
     try {
