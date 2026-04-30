@@ -278,13 +278,8 @@ app.post("/restaurants/:id/menu", async (req, res) => {
 
       const result = await client.query(
         `
-          WITH next_id AS (
-            SELECT COALESCE(MAX(id), 0) + 1 AS id
-            FROM menu_items
-          )
-          INSERT INTO menu_items (id, restaurant_id, name, description, price, available)
-          SELECT id, $1, $2, $3, $4, $5
-          FROM next_id
+          INSERT INTO menu_items (restaurant_id, name, description, price, available)
+          VALUES ($1, $2, $3, $4, $5)
           RETURNING id, restaurant_id, name, description, price, available, created_at, updated_at
         `,
         [
@@ -549,6 +544,24 @@ app.get("/health", async (req, res) => {
 
 async function startServer() {
   if (pool) {
+    await pool.query(`
+      CREATE SEQUENCE IF NOT EXISTS menu_items_id_seq
+    `);
+    await pool.query(`
+      ALTER SEQUENCE menu_items_id_seq OWNED BY menu_items.id
+    `);
+    await pool.query(`
+      ALTER TABLE menu_items
+      ALTER COLUMN id SET DEFAULT nextval('menu_items_id_seq')
+    `);
+    await pool.query(`
+      SELECT setval(
+        'menu_items_id_seq',
+        COALESCE((SELECT MAX(id) FROM menu_items), 0) + 1,
+        false
+      )
+    `);
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS idempotency_keys (
         operation TEXT NOT NULL,
