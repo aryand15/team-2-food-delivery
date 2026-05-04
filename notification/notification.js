@@ -288,8 +288,11 @@ app.get('/health', async (req, res) => {
 
 app.post('/inject-poison-pill', async (req, res) => {
   try {
-    const payload = `{poison-pill: true, "injectedAt": "${new Date().toISOString()}", broken`
-
+    const payload = JSON.stringify({
+        jobId: "poison-pill-" + Date.now(),
+        "poison-pill": true,
+        injectedAt: new Date().toISOString()
+    })
     await client.lPush(config.queueName, payload)
 
     res.status(202).json({
