@@ -173,7 +173,6 @@ const processJob = async (job) => {
 
 }
 
-// need to add actual worker loop
 const loop = async () => {
     while (true) {
         const result = await workerClient.brPop(config.queueName, 0)
