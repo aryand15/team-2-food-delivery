@@ -91,6 +91,127 @@ There were no Sprint 4 features intentionally cut from scope. Sprint 4 focused o
 
 Both runs completed with 100% success and near-identical throughput (~51 RPS). The replicated run shows higher p95/p99 latency because 51 RPS is within a single instance's capacity, so there was no bottleneck for extra replicas to relieve. The added tail latency comes from Caddy's proxying overhead and round-robin jitter. The similar p50 values confirm the typical request path is unaffected. Demonstrating a throughput gain from replication would require saturating the single instance (~200+ VUs), where its connection pool or CPU would become the bottleneck and distribution across replicas would prevent the p95 spike. At the load levels here, replication's benefit is fault tolerance and zero downtime deploys rather than raw throughput, which the replica failure test demonstrates directly.
 
+```
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+
+     execution: local
+        script: k6/sprint-4-scale.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 50 max VUs, 2m10s max duration (incl. graceful stop):
+              * default: Up to 50 looping VUs for 1m40s over 3 stages (gracefulRampDown: 30s, gracefulStop: 30s)
+
+
+
+  █ THRESHOLDS 
+
+    errors
+    ✓ 'rate<0.01' rate=0.00%
+
+    http_req_failed
+    ✓ 'rate<0.01' rate=0.00%
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 10418   103.683175/s
+    checks_succeeded...: 100.00% 10418 out of 10418
+    checks_failed......: 0.00%   0 out of 10418
+
+    ✓ status is 200
+    ✓ body is non-empty
+
+    CUSTOM
+    errors.........................: 0.00%  0 out of 5209
+
+    HTTP
+    http_req_duration..............: avg=4.2ms    min=366.08µs med=3.81ms   max=55.55ms p(50)=3.81ms   p(90)=6.96ms   p(95)=8.44ms   p(99)=12.88ms
+      { expected_response:true }...: avg=4.2ms    min=366.08µs med=3.81ms   max=55.55ms p(50)=3.81ms   p(90)=6.96ms   p(95)=8.44ms   p(99)=12.88ms
+    http_req_failed................: 0.00%  0 out of 5209
+    http_reqs......................: 5209   51.841587/s
+
+    EXECUTION
+    iteration_duration.............: avg=506.48ms min=500.88ms med=506.05ms max=556.5ms p(50)=506.05ms p(90)=510.06ms p(95)=511.78ms p(99)=517.6ms
+    iterations.....................: 5209   51.841587/s
+    vus............................: 1      min=1         max=49
+    vus_max........................: 50     min=50        max=50
+
+    NETWORK
+    data_received..................: 4.4 MB 43 kB/s
+    data_sent......................: 484 kB 4.8 kB/s
+
+
+
+
+running (1m40.5s), 00/50 VUs, 5209 complete and 0 interrupted iterations
+default ✓ [======================================] 00/50 VUs  1m40s
+root@637da18c3e96:/workspace# k6 run --env SCALE=replicated k6/sprint-4-scale.js
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+
+     execution: local
+        script: k6/sprint-4-scale.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 50 max VUs, 2m10s max duration (incl. graceful stop):
+              * default: Up to 50 looping VUs for 1m40s over 3 stages (gracefulRampDown: 30s, gracefulStop: 30s)
+
+
+
+  █ THRESHOLDS 
+
+    errors
+    ✓ 'rate<0.01' rate=0.00%
+
+    http_req_failed
+    ✓ 'rate<0.01' rate=0.00%
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 10436   104.211804/s
+    checks_succeeded...: 100.00% 10436 out of 10436
+    checks_failed......: 0.00%   0 out of 10436
+
+    ✓ status is 200
+    ✓ body is non-empty
+
+    CUSTOM
+    errors.........................: 0.00%  0 out of 5218
+
+    HTTP
+    http_req_duration..............: avg=3.49ms   min=334.33µs med=3.26ms   max=25.39ms  p(50)=3.26ms   p(90)=5.53ms   p(95)=6.78ms   p(99)=12.12ms 
+      { expected_response:true }...: avg=3.49ms   min=334.33µs med=3.26ms   max=25.39ms  p(50)=3.26ms   p(90)=5.53ms   p(95)=6.78ms   p(99)=12.12ms 
+    http_req_failed................: 0.00%  0 out of 5218
+    http_reqs......................: 5218   52.105902/s
+
+    EXECUTION
+    iteration_duration.............: avg=505.61ms min=500.62ms med=505.15ms max=526.76ms p(50)=505.15ms p(90)=508.91ms p(95)=510.35ms p(99)=515.01ms
+    iterations.....................: 5218   52.105902/s
+    vus............................: 2      min=1         max=49
+    vus_max........................: 50     min=50        max=50
+
+    NETWORK
+    data_received..................: 4.4 MB 44 kB/s
+    data_sent......................: 485 kB 4.8 kB/s
+
+
+
+
+running (1m40.1s), 00/50 VUs, 5218 complete and 0 interrupted iterations
+default ✓ [======================================] 00/50 VUs  1m40s
+```
+
 ### Test 2: Replica Failure (`k6/sprint-4-replica.js`)
 
 Test targets `GET /restaurant/restaurants` through Caddy with 3 restaurant-service replicas.
