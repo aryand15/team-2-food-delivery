@@ -547,13 +547,24 @@ async function startServer() {
     await pool.query(`
       CREATE SEQUENCE IF NOT EXISTS menu_items_id_seq
     `);
-    await pool.query(`
-      ALTER SEQUENCE menu_items_id_seq OWNED BY menu_items.id
-    `);
-    await pool.query(`
-      ALTER TABLE menu_items
-      ALTER COLUMN id SET DEFAULT nextval('menu_items_id_seq')
-    `);
+    try {
+      await pool.query(`
+        ALTER SEQUENCE menu_items_id_seq OWNED BY menu_items.id
+      `);
+    } catch (error) {
+      // Older local DB states may use an identity-backed sequence or different owner.
+      // In those cases this ALTER is not required for runtime correctness.
+      console.warn("Skipping sequence ownership update:", error.message || String(error));
+    }
+    try {
+      await pool.query(`
+        ALTER TABLE menu_items
+        ALTER COLUMN id SET DEFAULT nextval('menu_items_id_seq')
+      `);
+    } catch (error) {
+      // If id is already an identity/default column in a local DB, keep startup non-fatal.
+      console.warn("Skipping default sequence binding:", error.message || String(error));
+    }
     await pool.query(`
       SELECT setval(
         'menu_items_id_seq',
