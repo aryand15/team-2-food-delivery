@@ -8,7 +8,7 @@
 
 ## What We Built
 
-[Which services are replicated? How does load balancing work? What polish work was completed?]
+We completed the system by adding replication and load balancing for three core services: order-service, driver-service, and restaurant-service. We used docker compose up --scale and Caddy as a reverse proxy. We verified that traffic was distributed across replicas through logs, made sure the replicated services were stateless by relying on shared backing stores instead of local in-memory state, and polished the full system by fixing remaining integration issues, keeping health endpoints and DLQ handling working, and updating the README and final documentation so the project could be started, tested, and demoed reliably from a clean checkout.
 
 ---
 
