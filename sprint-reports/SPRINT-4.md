@@ -1,4 +1,4 @@
-# Sprint 4 Report — [Team Name]
+# Sprint 4 Report — Team 2
 
 **Sprint:** 4 — Replication, Scaling, and Polish  
 **Tag:** `sprint-4`  
@@ -17,7 +17,7 @@
 | Team Member | What They Delivered | Key Commits |
 | ----------- | ------------------- | ----------- |
 | Aryan      | made improvements to POST /orders route; ensured statelessness of order service and documented endpoints | 545f75a, bb4f653 |
-| [Name]      | | |
+| Ayaan      | Caddyfile and fixing compose.yml file; ensured restaurant service can be scaled | 30675c3, d554ae7, 78440af |
 | [Name]      | | |
 
 ---
@@ -25,7 +25,7 @@
 ## Starting the System with Replicas
 
 ```bash
-docker compose up --scale [service-name]=3 --scale [other-service]=2
+docker compose up --build --scale order-service=3 --scale driver-service=3 --scale restaurant-service=3
 ```
 
 After startup:
