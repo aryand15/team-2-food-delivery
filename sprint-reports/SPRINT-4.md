@@ -2,7 +2,7 @@
 
 **Sprint:** 4 — Replication, Scaling, and Polish  
 **Tag:** `sprint-4`  
-**Submitted:** [date, before 05.05 class]
+**Submitted:** 2026-05-05
 
 ---
 
@@ -21,7 +21,7 @@ We completed the system by adding replication and load balancing for three core 
 | Eva      | k6 test; scale test for caddy; docs  | 0f1e161, 2224665|
 | Jada      | finalized/polished preparation tracker worker; sprint 4 report| 614a248, 38f2ca0 |
 | Gianna     | fixed poison pill payload syntax; finalized/polished notification worker | 9b7625e, e3cb968 |
-| Phoebe      | | |
+| Phoebe      | replica failure k6 test; final README | 8cf2e6c, 6d8c8dd |
 | Nivaan      | | |
 | Ashley     | finalized/polished order dispatch worker | 18706e6 |
 
@@ -65,11 +65,11 @@ team-2-food-delivery-restaurant-service-3   team-2-food-delivery-restaurant-serv
 
 ## What Is Working
 
-- [ ] At least 3 services replicated via `--scale`
-- [ ] Load balancer distributes traffic across replicas (visible in logs)
-- [ ] Services are stateless — multiple instances run without conflicts
-- [ ] `docker compose ps` shows all replicas as `(healthy)`
-- [ ] System is fully complete for team size
+- [x] At least 3 services replicated via `--scale`
+- [x] Load balancer distributes traffic across replicas (visible in logs)
+- [x] Services are stateless — multiple instances run without conflicts
+- [x] `docker compose ps` shows all replicas as `(healthy)`
+- [x] System is fully complete for team size
 
 ---
 
