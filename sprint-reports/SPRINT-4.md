@@ -65,7 +65,7 @@ team-2-food-delivery-restaurant-service-3   team-2-food-delivery-restaurant-serv
 
 ## What Is Working
 
-- [ ] At least [N] services replicated via `--scale`
+- [ ] At least 3 services replicated via `--scale`
 - [ ] Load balancer distributes traffic across replicas (visible in logs)
 - [ ] Services are stateless — multiple instances run without conflicts
 - [ ] `docker compose ps` shows all replicas as `(healthy)`
