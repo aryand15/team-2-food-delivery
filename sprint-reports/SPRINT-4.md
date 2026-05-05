@@ -84,12 +84,12 @@ There were no Sprint 4 features intentionally cut from scope. Sprint 4 focused o
 
 | Metric | 1 replica | 3 replicas | Change |
 | ------ | --------- | ---------- | ------ |
-| p50    | | | |
-| p95    | | | |
-| p99    | | | |
-| RPS    | | | |
+| p50    | 4.09ms | 4.08ms  | -0.01ms|
+| p95    | 16.45ms | 30.6ms | +14.15ms |
+| p99    | 32.72ms | 82.94ms  | +50.22ms |
+| RPS    | 51.667363 req/s| 51.274331/s | -0.393032ms |
 
-[Explain the improvement. Which replica count started to show diminishing returns?]
+Both runs completed with 100% success and near-identical throughput (~51 RPS). The replicated run shows higher p95/p99 latency because 51 RPS is within a single instance's capacity, so there was no bottleneck for extra replicas to relieve. The added tail latency comes from Caddy's proxying overhead and round-robin jitter. The similar p50 values confirm the typical request path is unaffected. Demonstrating a throughput gain from replication would require saturating the single instance (~200+ VUs), where its connection pool or CPU would become the bottleneck and distribution across replicas would prevent the p95 spike. At the load levels here, replication's benefit is fault tolerance and zero downtime deploys rather than raw throughput, which the replica failure test demonstrates directly.
 
 ### Test 2: Replica Failure (`k6/sprint-4-replica.js`)
 

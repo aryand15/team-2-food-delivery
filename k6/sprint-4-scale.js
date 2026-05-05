@@ -1,5 +1,7 @@
 import http from 'k6/http'
+import { Rate } from 'k6/metrics';
 import { check, sleep } from 'k6'
+const errors = new Rate("errors");
 
 // Run with: k6 run --env SCALE=single k6/sprint-4-scale.js
 // Run with: k6 run --env SCALE=replicated k6/sprint-4-scale.js
