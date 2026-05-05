@@ -91,7 +91,7 @@ There were no Sprint 4 features intentionally cut from scope. Sprint 4 focused o
 
 Both runs completed with 100% success and near-identical throughput (~51 RPS). The replicated run shows higher p95/p99 latency because 51 RPS is within a single instance's capacity, so there was no bottleneck for extra replicas to relieve. The added tail latency comes from Caddy's proxying overhead and round-robin jitter. The similar p50 values confirm the typical request path is unaffected. Demonstrating a throughput gain from replication would require saturating the single instance (~200+ VUs), where its connection pool or CPU would become the bottleneck and distribution across replicas would prevent the p95 spike. At the load levels here, replication's benefit is fault tolerance and zero downtime deploys rather than raw throughput, which the replica failure test demonstrates directly.
 
-
+```
          /\      Grafana   /‾‾/  
     /\  /  \     |\  __   /  /   
    /  \/    \    | |/ /  /   ‾‾\ 
@@ -210,6 +210,7 @@ root@637da18c3e96:/workspace# k6 run --env SCALE=replicated k6/sprint-4-scale.js
 
 running (1m40.1s), 00/50 VUs, 5218 complete and 0 interrupted iterations
 default ✓ [======================================] 00/50 VUs  1m40s
+```
 
 ### Test 2: Replica Failure (`k6/sprint-4-replica.js`)
 
