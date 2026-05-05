@@ -23,7 +23,7 @@ We completed the system by adding replication and load balancing for three core 
 | Gianna     | fixed poison pill payload syntax; finalized/polished notification worker | 9b7625e, e3cb968 |
 | Phoebe      | | |
 | Nivaan      | | |
-| Ashley     | finalized/polished order dispatch worker | |
+| Ashley     | finalized/polished order dispatch worker | 18706e6 |
 
 ---
 
