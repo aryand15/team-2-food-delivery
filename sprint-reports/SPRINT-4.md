@@ -2,7 +2,7 @@
 
 **Sprint:** 4 — Replication, Scaling, and Polish  
 **Tag:** `sprint-4`  
-**Submitted:** [date, before 05.05 class]
+**Submitted:** 2026-05-05
 
 ---
 
@@ -21,7 +21,7 @@ We completed the system by adding replication and load balancing for three core 
 | Eva      | k6 test; scale test for caddy; docs  | 0f1e161, 2224665|
 | Jada      | finalized/polished preparation tracker worker; sprint 4 report| 614a248, 38f2ca0 |
 | Gianna     | fixed poison pill payload syntax; finalized/polished notification worker | 9b7625e, e3cb968 |
-| Phoebe      | | |
+| Phoebe      | replica failure k6 test; final README | 8cf2e6c, 6d8c8dd |
 | Nivaan      | | |
 | Ashley     | finalized/polished order dispatch worker | 18706e6 |
 
@@ -65,11 +65,11 @@ team-2-food-delivery-restaurant-service-3   team-2-food-delivery-restaurant-serv
 
 ## What Is Working
 
-- [ ] At least 3 services replicated via `--scale`
-- [ ] Load balancer distributes traffic across replicas (visible in logs)
-- [ ] Services are stateless — multiple instances run without conflicts
-- [ ] `docker compose ps` shows all replicas as `(healthy)`
-- [ ] System is fully complete for team size
+- [x] At least 3 services replicated via `--scale`
+- [x] Load balancer distributes traffic across replicas (visible in logs)
+- [x] Services are stateless — multiple instances run without conflicts
+- [x] `docker compose ps` shows all replicas as `(healthy)`
+- [x] System is fully complete for team size
 
 ---
 
@@ -93,30 +93,57 @@ There were no Sprint 4 features intentionally cut from scope. Sprint 4 focused o
 
 ### Test 2: Replica Failure (`k6/sprint-4-replica.js`)
 
+Test targets `GET /restaurant/restaurants` through Caddy with 3 restaurant-service replicas.
+20 VUs sustained for 120s. One replica stopped manually at ~T+45s and restarted at ~T+90s.
+
 Timeline:
 
 | Time | Event |
 | ---- | ----- |
-| 0s   | k6 started, 3 replicas running |
-| [t]s | Killed replica: `docker stop [container-id]` |
-| [t]s | Surviving replicas absorbed traffic |
-| [t]s | Replica restarted: `docker compose up -d` |
-| [t]s | Traffic redistributed, back to normal |
+| 0s   | k6 started, 3 replicas running, ramp-up begins |
+| 30s  | Full 20 VUs reached, sustained phase begins |
+| ~45s | Stopped one replica: `docker stop team-2-food-delivery-restaurant-service-2` |
+| ~45s | Caddy redistributed traffic to remaining 2 healthy replicas |
+| ~90s | Restarted: `docker compose up --scale restaurant-service=3 -d` |
+| ~90s | Third replica rejoined, traffic redistributed across all 3 |
+| 150s | Recovery verification phase complete |
+| 190s | Ramp-down, test complete |
 
 ```
-[Paste k6 output showing before / during / after the failure — annotate with timestamps]
+checks_total.......: 13468   70.87/s
+checks_succeeded...: 100.00% 13468 out of 13468
+checks_failed......: 0.00%   0 out of 13468
+
+✓ status is 200
+✓ response time < 1000ms
+
+errors.........................: 0.00%  0 out of 6734
+
+http_req_duration..............: avg=4.29ms  min=364µs  med=4.03ms  max=57.96ms
+                                  p(90)=6.92ms  p(95)=8.1ms  p(99)=10.86ms
+http_req_failed................: 0.00%  0 out of 6734
+http_reqs......................: 6734   35.43/s
+
+✓ errors rate<0.01
+✓ http_req_duration p(95)<1000ms
 ```
 
-During failure — `docker compose ps`:
+Zero failed requests during replica stop and restart. p95 stayed well under threshold (8.1ms vs 1000ms limit). Caddy's round-robin DNS absorbed the failure transparently.
+
+During failure — `docker compose ps` (replica-2 stopped):
 
 ```
-[Paste output showing stopped/unhealthy replica alongside healthy survivors]
+team-2-food-delivery-restaurant-service-1   Up (healthy)
+team-2-food-delivery-restaurant-service-2   Exited
+team-2-food-delivery-restaurant-service-3   Up (healthy)
 ```
 
 After restart — `docker compose ps`:
 
 ```
-[Paste output showing all replicas back to (healthy)]
+team-2-food-delivery-restaurant-service-1   Up (healthy)
+team-2-food-delivery-restaurant-service-2   Up (healthy)
+team-2-food-delivery-restaurant-service-3   Up (healthy)
 ```
 
 ---
