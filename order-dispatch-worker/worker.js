@@ -80,7 +80,7 @@ function validateJob(job) {
 async function verifyRestaurant(restaurantId) {
     let res
     try {
-        res = await fetch(`${config.restaurantServiceUrl}/restaurants/${restaurantId}/menu`)
+        res = await fetch(`${config.restaurantServiceUrl}/restaurants/${restaurantId}/menu`, { signal: AbortSignal.timeout(5000) })
     } catch (err) {
         throw new Error(`restaurant service unreachable: ${err.message}`)
     }
@@ -98,8 +98,9 @@ async function assignDriver(orderId, restaurantId) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
             order_id: orderId, 
-            source_event_id: orderId  // use orderId as the idempotency key
+            source_event_id: orderId
         }),
+        signal: AbortSignal.timeout(5000),
     })
     if (!res.ok) {
         const text = await res.text()
