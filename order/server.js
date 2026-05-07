@@ -95,8 +95,42 @@ app.post("/orders", async (req, res) => {
 
   const { clientOrderId, restaurantId, items } = payload;
 
-  // TODO: verify restaurantId and each item's menuItemId via the restaurant service
-  // once that service's schema is available.
+  let menu;
+  try {
+    const response = await fetch(
+      `http://restaurant-service:3003/restaurants/${restaurantId}/menu`
+    );
+
+    if (response.status === 404) {
+      return res.status(400).json({
+        error: `Restaurant ${restaurantId} was not found`
+      });
+    }
+
+    if (!response.ok) {
+      return res.status(502).json({
+        error: "Failed to fetch restaurant menu"
+      });
+    }
+
+    menu = await response.json();
+  } catch (err) {
+    return res.status(502).json({
+      error: "Restaurant service unavailable",
+      detail: err.message
+    });
+  }
+
+  const menuItems = Array.isArray(menu.items) ? menu.items : [];
+  const validMenuItemIds = new Set(menuItems.map((item) => item.id));
+
+  for (const { menuItemId } of items) {
+    if (!validMenuItemIds.has(menuItemId)) {
+      return res.status(400).json({
+        error: `Item with ID ${menuItemId} does not exist for this restaurant`
+      });
+    }
+  }
 
 
   const query = `

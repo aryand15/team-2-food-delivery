@@ -18,7 +18,7 @@
 | Jada        | `preparation-tracker-worker/`                           |
 | Ashley      | `order-dispatch-worker/`                                |
 | Gianna      | `notification-worker/`                                  |
-| Phoebe      | `delivery-tracker-worker/`                              |
+| Phoebe      | `delivery-tracker-worker/`, `k6/`                             |
 
 > Ownership is verified by `git log --author`. Each person must have meaningful commits in the directories they claim.
 
@@ -30,8 +30,8 @@
 # Start everything (builds images on first run)
 docker compose up --build
 
-# Start with service replicas (Sprint 4)
-docker compose up --scale your-service=3
+# Start with three replicas of each scalable service (Sprint 4)
+docker compose up --scale order-service=3 --scale restaurant-service=3 --scale driver-service=3 --build
 
 # Verify all services are healthy
 docker compose ps
@@ -59,6 +59,58 @@ holmes                    (no port — access via exec)
 > `curl http://order-service:3001/health`
 >
 > See [holmes/README.md](holmes/README.md) for a full tool reference.
+
+### Caddy Gateway (port 80)
+
+All four services are fronted by Caddy, which load-balances across replicas:
+
+```
+http://localhost:80/order/*       → order-service:3001
+http://localhost:80/driver/*      → driver-service:3002
+http://localhost:80/restaurant/*  → restaurant-service:3003
+http://localhost:80/rating/*      → rating-service:3004
+```
+
+Caddy strips the prefix before forwarding, so `/restaurant/restaurants` maps to `/restaurants` on restaurant-service.
+
+### Seed Data
+
+Seed data is applied automatically when the database containers first start (via `docker-entrypoint-initdb.d`). No manual step is needed.
+
+Data seeded on first boot:
+- **restaurant-db**: restaurants `id=1` (Sample Restaurant) and `id=2` (Pizza Palace), plus menu items `101–103` and `201–202`
+- **order-db**: schema only (no seed rows)
+
+### Running k6 Tests
+
+All k6 scripts are in the `k6/` directory and are designed to run from inside the holmes container (they use Docker service names, not localhost):
+
+```bash
+# Open a shell in holmes
+docker compose exec holmes bash
+
+# Sprint 1 — baseline read load test
+k6 run /workspace/k6/sprint-1.js
+
+# Sprint 2 — async and cache tests
+k6 run /workspace/k6/sprint-2-async.js
+k6 run /workspace/k6/sprint-2-cache.js
+
+# Sprint 3 — poison pill / DLQ test
+k6 run /workspace/k6/sprint-3-poison.js
+
+# Sprint 4 — replica failure resilience test (run with 3 replicas active)
+k6 run /workspace/k6/sprint-4-replica.js
+
+# Sprint 4 — scaling comparison (run once at single instance, once at 3 replicas)
+k6 run /workspace/k6/sprint-4-scale.js
+```
+
+To run from your host machine instead (if k6 is installed locally), override `BASE_URL`:
+
+```bash
+k6 run --env BASE_URL=http://localhost:80 k6/sprint-4-replica.js
+```
 
 ---
 
@@ -136,6 +188,104 @@ curl http://localhost:3001/get-drivers
   { "id": 1, "name": "John Doe", "status": "available" },
   { "id": 2, "name": "Jane Smith", "status": "busy" }
 ]
+```
+
+#### POST /orders
+
+```
+POST /orders
+
+  Creates a new order if the idempotency key has not been used before.
+  If the same clientOrderId is submitted again, the existing order is returned.
+
+  Request body:
+    clientOrderId  string   required
+    restaurantId   string   required
+    items          array    required
+
+  Each item object must contain:
+    menuItemId     integer  required
+    quantity       integer  required, must be > 0
+
+  Responses:
+    201  Order accepted and queued
+    200  Duplicate order, existing order returned
+    400  Invalid request body
+    500  Internal server error
+```
+
+**Example request:**
+
+```bash
+curl -X POST http://localhost:3001/orders \
+  -H "Content-Type: application/json" \
+  -d '{
+    "clientOrderId": "order-123",
+    "restaurantId": "1",
+    "items": [
+      { "menuItemId": 101, "quantity": 2 },
+      { "menuItemId": 103, "quantity": 1 }
+    ]
+  }'
+```
+
+**Example response (201):**
+
+```json
+{
+  "message": "Order accepted",
+  "order": {
+    "id": "0f2c6d92-2fa4-4a91-b87f-cf6d0d6a9d50",
+    "idempotency_key": "order-123",
+    "restaurant_id": "1",
+    "customer_id": null,
+    "items": [
+      { "menuItemId": 101, "quantity": 2 },
+      { "menuItemId": 103, "quantity": 1 }
+    ],
+    "status": "queued",
+    "dispatch_attempt_count": 0,
+    "created_at": "2026-04-28T00:00:00.000Z",
+    "updated_at": "2026-04-28T00:00:00.000Z"
+  }
+}
+```
+
+#### GET /orders/:id
+
+```
+GET /orders/:id
+
+  Returns the current status and metadata for a single order.
+
+  Path parameters:
+    id  string  required
+
+  Responses:
+    200  Order found
+    404  Order not found
+    500  Internal server error
+```
+
+**Example request:**
+
+```bash
+curl http://localhost:3001/orders/0f2c6d92-2fa4-4a91-b87f-cf6d0d6a9d50
+```
+
+**Example response (200):**
+
+```json
+{
+  "orderId": "0f2c6d92-2fa4-4a91-b87f-cf6d0d6a9d50",
+  "clientOrderId": "order-123",
+  "restaurantId": "1",
+  "customerId": null,
+  "status": "queued",
+  "dispatchAttemptCount": 0,
+  "createdAt": "2026-04-28T00:00:00.000Z",
+  "updatedAt": "2026-04-28T00:00:00.000Z"
+}
 ```
 
 ---
@@ -486,6 +636,37 @@ curl http://localhost:3006/health
   "checks": {
     "redis": { "status": "healthy", "latency_ms": 1 }
   }
+}
+```
+
+#### POST /inject-poison-pill
+
+```
+POST /inject-poison-pill
+
+  Injects a deliberately malformed message into the delivery queue to verify
+  DLQ handling. The worker will fail to parse it and route it to
+  deliveries:queue:dlq.
+
+  Responses:
+    200  Poison pill injected
+```
+
+**Example request:**
+
+```bash
+curl -X POST http://localhost:3006/inject-poison-pill
+```
+
+**Example response (200):**
+
+```json
+{
+  "injected": true,
+  "queue": "deliveries:queue",
+  "dlq": "deliveries:queue:dlq",
+  "payload": "{poison-pill: true, \"injectedAt\": \"2026-04-20T00:00:00.000Z\", broken",
+  "timestamp": "2026-04-20T00:00:00.000Z"
 }
 ```
 

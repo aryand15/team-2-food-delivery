@@ -52,12 +52,29 @@ services:
 
   # ── Services ─────────────────────────────────────────────────
 
-  order-service:
-    build: ./order
-    container_name: order-service
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
     restart: unless-stopped
     ports:
-      - "3001:3001"
+      - "80:80"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    networks:
+      - team-net
+    depends_on:
+      order-service:
+        condition: service_healthy
+      driver-service:
+        condition: service_healthy
+      restaurant-service:
+        condition: service_healthy
+      rating-service:
+        condition: service_healthy
+
+  order-service:
+    build: ./order
+    restart: unless-stopped
     networks:
       - team-net
     environment:
@@ -81,10 +98,7 @@ services:
       start_period: 15s
   driver-service:
     build: ./driver
-    container_name: driver-service
     restart: unless-stopped
-    ports:
-      - "3002:3002"
     networks:
       - team-net
     environment:
@@ -106,10 +120,7 @@ services:
 
   restaurant-service:
     build: ./restaurant
-    container_name: restaurant-service
     restart: unless-stopped
-    ports:
-      - "3003:3003"
     networks:
       - team-net
     environment:
@@ -131,10 +142,7 @@ services:
 
   rating-service:
     build: ./rating
-    container_name: rating-service
     restart: unless-stopped
-    ports:
-      - "3004:3004"
     networks:
       - team-net
     environment:

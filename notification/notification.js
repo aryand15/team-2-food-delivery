@@ -22,6 +22,9 @@ const config = {
 const client = createClient({ url: config.redisUrl })
 await client.connect() 
 
+// add log
+console.log(`pipeline=${config.pipeline} service=worker event=initialized redis_connected=true mode=${config.mode}`)
+
 const workerClient = createClient({ url: config.redisUrl });
 await workerClient.connect()
 
@@ -113,8 +116,6 @@ const scheduleRetry = async (job, attempt, errorMsg) => { // retry bad job
             `attempt=${attempt} backoffMs=${backoffMs} error="${errorMsg}"`,
     );
 
-//    await client.lPush(config.queueName, JSON.stringify(RetryJob(job, attempt)));
-
     setTimeout(async () => {
         try {
             await client.lPush(config.queueName, JSON.stringify(RetryJob(job, attempt)));
@@ -126,7 +127,12 @@ const scheduleRetry = async (job, attempt, errorMsg) => { // retry bad job
 };
 
 const processJob = async (job) => {
+
     const attempt = job.retryAttempt ?? 0
+    
+    // add log
+    console.log(`pipeline=${config.pipeline} job=${job.jobId} event=processing attempt=${attempt} max_retries=${config.maxRetries}`)
+
     await client.hSet(
         keys.job(job.jobId),
         JobStatus("processing", {
@@ -138,8 +144,6 @@ const processJob = async (job) => {
     await client.hIncrBy(keys.job(job.jobId), "processAttempts", 1);
     await client.expire(keys.job(job.jobId), config.ttlSec);
 
-    // add idem later...
-
     try {
         const { delayMs, effectCount } = await applySideEffect(job.jobId)
         const doneAt = new Date().toISOString()
@@ -150,7 +154,6 @@ const processJob = async (job) => {
                 updatedAt: doneAt,
                 finishedAt: doneAt,
                 effectCount: String(effectCount),
-                // idempotency: config.mode === "idem" ? "applied" : "none",
             }),
         );
 
@@ -173,7 +176,6 @@ const processJob = async (job) => {
 
 }
 
-// need to add actual worker loop
 const loop = async () => {
     while (true) {
         const result = await workerClient.brPop(config.queueName, 0)
@@ -289,8 +291,11 @@ app.get('/health', async (req, res) => {
 
 app.post('/inject-poison-pill', async (req, res) => {
   try {
-    const payload = `{poison-pill: true, "injectedAt": "${new Date().toISOString()}", broken`
-
+    const payload = JSON.stringify({
+        jobId: "poison-pill-" + Date.now(),
+        "poison-pill": true,
+        injectedAt: new Date().toISOString()
+    })
     await client.lPush(config.queueName, payload)
 
     res.status(202).json({
@@ -300,6 +305,7 @@ app.post('/inject-poison-pill', async (req, res) => {
       payload,
       timestamp: new Date().toISOString()
     })
+
   } catch (err) {
     res.status(500).json({
       error: err.message

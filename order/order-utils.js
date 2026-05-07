@@ -38,10 +38,10 @@ export const validateOrderPayload = (payload = {}) => {
 
     const { menuItemId, quantity } = item;
 
-    if (!menuItemId || typeof menuItemId != "string") {
+    if (!Number.isInteger(menuItemId)) {
       return {
         valid: false,
-        error: `Item ${i}: menuItemId is required and must be a string`
+        error: `Item ${i}: menuItemId must be an integer`
       };
     }
     if (!Number.isInteger(quantity) || quantity <= 0) {
